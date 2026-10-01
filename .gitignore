@@ -1,0 +1,48 @@
+# Unreal Engine generated folders
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Plugin generated folders (project plugins)
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.suo
+*.user
+*.sln.docstates
+*.xcodeproj
+*.xcworkspace
+
+# Generated solution files (regenerate from .uproject)
+*.sln
+*.slnx
+
+# Compiled / debug artifacts
+*.pdb
+*.obj
+*.o
+*.a
+*.lib
+*.exp
+*.ilk
+*.dll
+*.exe
+*.dylib
+*.so
+
+# Misc
+*.DotSettings.user
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
