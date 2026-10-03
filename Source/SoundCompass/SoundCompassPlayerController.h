@@ -8,6 +8,7 @@
 
 class UInputMappingContext;
 class UUserWidget;
+class USoundVisualizationWidget;
 
 /**
  *  Basic PlayerController class for a third person game
@@ -40,11 +41,26 @@ protected:
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
+	/** Automatically shows the character-centred sound visualization in the test map. */
+	UPROPERTY(EditAnywhere, Category="Sound Compass")
+	bool bEnableSoundVisualization = true;
+
+	UPROPERTY(EditAnywhere, Category="Sound Compass")
+	TSubclassOf<USoundVisualizationWidget> SoundVisualizationWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundVisualizationWidget> SoundVisualizationWidget;
+
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
+
+	/** V switches the visualization overlay on or off during an experiment. */
+	void ToggleSoundVisualization();
+	void ToggleSoundDisplayMode();
+	void ToggleSoundDiagnostics();
 
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;

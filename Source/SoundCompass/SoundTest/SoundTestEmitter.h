@@ -73,6 +73,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sound Test|Sound")
 	FName SoundCategory;
 
+	/** -1 uses the category rule; 0..1 supplies this emitter's experimental importance. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sound Test|Visualization", meta=(ClampMin="-1.0", ClampMax="1.0"))
+	float VisualizationImportance = -1.0f;
+
 	/** Sound played continuously while the emitter is active. Should be a looping sound */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sound Test|Sound")
 	TObjectPtr<USoundBase> LoopSound;

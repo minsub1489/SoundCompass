@@ -1,12 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SoundTest/SoundTestDoor.h"
+#include "SoundVisualization/SoundVisualizationSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/CollisionProfile.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundAttenuation.h"
+#include "Engine/World.h"
 
 ASoundTestDoor::ASoundTestDoor()
 {
@@ -135,6 +137,13 @@ void ASoundTestDoor::PlayDoorSound(USoundBase* Sound) const
 	if (Sound)
 	{
 		const FVector Center = Root->GetComponentTransform().TransformPosition(FVector(DoorSize.X * 0.5f, 0.0f, DoorSize.Z * 0.5f));
-		UGameplayStatics::SpawnSoundAtLocation(this, Sound, Center, FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, Attenuation);
+		if (USoundVisualizationSubsystem* Visualization = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+		{
+			Visualization->PlayVisualizedSound(Sound, Center, TEXT("Door"), Attenuation, 1.0f, 1.0f, const_cast<ASoundTestDoor*>(this));
+		}
+		else
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, Sound, Center, FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, Attenuation);
+		}
 	}
 }

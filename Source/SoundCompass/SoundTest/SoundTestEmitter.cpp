@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SoundTest/SoundTestEmitter.h"
+#include "SoundVisualization/SoundVisualizationSubsystem.h"
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -50,9 +51,13 @@ void ASoundTestEmitter::OnConstruction(const FTransform& Transform)
 	Audio->SetRelativeLocation(FVector(0.0f, 0.0f, SoundHeight));
 
 	const bool bUsesArea = Movement == ESoundTestMovement::Teleport || Movement == ESoundTestMovement::Wander;
-	MoveAreaPreview->SetVisibility(bUsesArea);
-	MoveAreaPreview->SetBoxExtent(FVector(MoveAreaExtent.X, MoveAreaExtent.Y, 10.0f));
-	MoveAreaPreview->SetWorldLocationAndRotation(GetActorLocation() + FVector(MoveAreaOffset.X, MoveAreaOffset.Y, 0.0f), FRotator::ZeroRotator);
+	// Editor-only components are stripped during standalone play and packaging.
+	if (MoveAreaPreview)
+	{
+		MoveAreaPreview->SetVisibility(bUsesArea);
+		MoveAreaPreview->SetBoxExtent(FVector(MoveAreaExtent.X, MoveAreaExtent.Y, 10.0f));
+		MoveAreaPreview->SetWorldLocationAndRotation(GetActorLocation() + FVector(MoveAreaOffset.X, MoveAreaOffset.Y, 0.0f), FRotator::ZeroRotator);
+	}
 
 	// preview the idle pose in the editor
 	if (IdleAnimation && Body->GetSkeletalMeshAsset())
@@ -82,6 +87,10 @@ void ASoundTestEmitter::BeginPlay()
 		}
 
 		Audio->SetSound(LoopSound);
+		if (USoundVisualizationSubsystem* Visualization = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+		{
+			Visualization->RegisterAudioComponent(Audio, SoundCategory, this, VisualizationImportance);
+		}
 		Audio->Play(StartTime);
 		OnSoundEmitted.Broadcast(this, LoopSound, GetSoundLocation());
 	}
@@ -104,6 +113,10 @@ void ASoundTestEmitter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(OneShotTimer);
 	GetWorldTimerManager().ClearTimer(TeleportTimer);
+	if (USoundVisualizationSubsystem* Visualization = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+	{
+		Visualization->UnregisterAudioComponent(Audio);
+	}
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -139,7 +152,14 @@ void ASoundTestEmitter::TickFootsteps(float DeltaSeconds)
 	if (USoundBase* Step = FootstepSounds[FMath::RandRange(0, FootstepSounds.Num() - 1)])
 	{
 		const FVector Feet = GetActorLocation();
-		UGameplayStatics::SpawnSoundAtLocation(this, Step, Feet, FRotator::ZeroRotator, Volume, FMath::FRandRange(0.95f, 1.05f), 0.0f, Attenuation);
+		if (USoundVisualizationSubsystem* Visualization = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+		{
+			Visualization->PlayVisualizedSound(Step, Feet, TEXT("Footstep"), Attenuation, Volume, FMath::FRandRange(0.95f, 1.05f), this);
+		}
+		else
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, Step, Feet, FRotator::ZeroRotator, Volume, FMath::FRandRange(0.95f, 1.05f), 0.0f, Attenuation);
+		}
 		OnSoundEmitted.Broadcast(this, Step, Feet);
 	}
 }
@@ -174,7 +194,14 @@ void ASoundTestEmitter::PlayOneShot()
 	if (USoundBase* Sound = OneShotSounds[FMath::RandRange(0, OneShotSounds.Num() - 1)])
 	{
 		// spawned at a fixed location so the tail stays where the sound happened, even if the emitter moves on
-		UGameplayStatics::SpawnSoundAtLocation(this, Sound, GetSoundLocation(), FRotator::ZeroRotator, Volume, 1.0f, 0.0f, Attenuation);
+		if (USoundVisualizationSubsystem* Visualization = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+		{
+			Visualization->PlayVisualizedSound(Sound, GetSoundLocation(), SoundCategory, Attenuation, Volume, 1.0f, this, VisualizationImportance);
+		}
+		else
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, Sound, GetSoundLocation(), FRotator::ZeroRotator, Volume, 1.0f, 0.0f, Attenuation);
+		}
 		OnSoundEmitted.Broadcast(this, Sound, GetSoundLocation());
 	}
 
