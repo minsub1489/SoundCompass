@@ -2,6 +2,7 @@
 #include "SoundVisualization/SoundCategory.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
@@ -56,6 +57,7 @@ void USoundVisualizationWidget::NativeOnInitialized()
     WidgetTree->RootWidget = RootCanvas;
     CenterRing = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("SoundCompassRing"));
     if (RingMaterial) { CenterRing->SetBrushFromMaterial(RingMaterial); }
+    CenterRing->SetRenderOpacity(0.12f);
     if (UMaterialInstanceDynamic* Circle = CenterRing->GetDynamicMaterial())
     {
         Circle->SetVectorParameterValue(TEXT("LineColor"), FLinearColor(0.25f, 0.75f, 0.85f, 0.6f));
@@ -87,7 +89,8 @@ FLinearColor USoundVisualizationWidget::GetCategoryColor(FName Category)
     if (Name == TEXT("Footstep")) { return FLinearColor(0.25f, 0.90f, 0.54f); }
     if (Name == TEXT("Door")) { return FLinearColor(0.35f, 0.65f, 1.0f); }
     if (Name == TEXT("Conversation")) { return FLinearColor(0.80f, 0.50f, 1.0f); }
-    if (Name == TEXT("Alert")) { return FLinearColor(1.0f, 0.40f, 0.20f); }
+    if (Name == TEXT("Alert")) { return FLinearColor(1.0f, 0.92f, 0.20f); }
+    if (Name == TEXT("Ambience")) { return FLinearColor(1.0f, 0.45f, 0.78f); }
     return FLinearColor(0.25f, 0.83f, 0.90f);
 }
 
@@ -109,15 +112,24 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
     RefreshTime += InDeltaTime;
-    if (RefreshTime < 1.0f / 30.0f || !RootCanvas) { return; }
-    RefreshTime = 0.0f;
-    if (USoundVisualizationSubsystem* System = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+    if (!RootCanvas || !GetWorld()) { return; }
+    if (RefreshTime >= 1.0f / 30.0f)
     {
-        CandidateFrames = System->GetSourceFrames(GetOwningPlayer());
-        SourceFrames = System->SelectSourceFrames(CandidateFrames);
-        DisplayMode = System->DisplayMode;
-        SignalFrame = System->GetSignalFrame();
+        RefreshTime = 0.0f;
+        if (USoundVisualizationSubsystem* System = GetWorld()->GetSubsystem<USoundVisualizationSubsystem>())
+        {
+            CandidateFrames = System->GetSourceFrames(GetOwningPlayer());
+            SourceFrames = System->SelectSourceFrames(CandidateFrames);
+            DisplayMode = System->DisplayMode;
+            SignalFrame = System->GetSignalFrame();
+        }
     }
+    UpdateMarkers(MyGeometry);
+    InvalidateLayoutAndVolatility();
+}
+
+void USoundVisualizationWidget::UpdateMarkers(const FGeometry& MyGeometry)
+{
     const FVector2D Size = MyGeometry.GetLocalSize();
     const float Scale = HudScale(Size);
     // Follow the projected pawn, including camera motion and viewport DPI scaling.
@@ -141,6 +153,8 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
     }
     CenterRing->SetVisibility(bShowCompass ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     TSet<int32> ActiveIds;
+    const float IconExtent = FMath::Clamp(IconSize, 32.0f, 96.0f);
+    const float MarkerExtent = IconExtent + 16.0f;
     const int32 Count = bShowCompass ? SourceFrames.Num() : 0;
     for (int32 Index = 0; Index < Count; ++Index)
     {
@@ -153,12 +167,12 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
             if (Marker)
             {
                 RootCanvas->AddChildToCanvas(Marker);
-                Marker->WidgetTree->ForEachWidget([](UWidget* Child)
+                Marker->WidgetTree->ForEachWidget([MarkerExtent](UWidget* Child)
                 {
                     if (USizeBox* Box = Cast<USizeBox>(Child))
                     {
-                        Box->SetWidthOverride(48.0f);
-                        Box->SetHeightOverride(48.0f);
+                        Box->SetWidthOverride(MarkerExtent);
+                        Box->SetHeightOverride(MarkerExtent);
                     }
                     if (UImage* Image = Cast<UImage>(Child))
                     {
@@ -167,12 +181,28 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
                             ImageSlot->SetAnchors(FAnchors(0.5f, 0.5f));
                             ImageSlot->SetAlignment(FVector2D(0.5f, 0.5f));
                             ImageSlot->SetPosition(FVector2D::ZeroVector);
-                            const float Extent = Image->GetFName() == TEXT("Image_Icon") ? 32.0f : 48.0f;
-                            ImageSlot->SetSize(FVector2D(Extent, Extent));
+                            ImageSlot->SetSize(FVector2D(MarkerExtent, MarkerExtent));
                             ImageSlot->SetAutoSize(false);
                         }
                     }
                 });
+                if (UImage* Icon = Cast<UImage>(Marker->GetWidgetFromName(TEXT("Image_Icon"))))
+                {
+                    if (UCanvasPanel* Canvas = Cast<UCanvasPanel>(Icon->GetParent()))
+                    {
+                        UImage* Badge = Marker->WidgetTree->ConstructWidget<UImage>(
+                            UImage::StaticClass(), TEXT("SoundCompassCategoryBadge"));
+                        FSlateRoundedBoxBrush BadgeBrush(FLinearColor::White,
+                            FLinearColor(0.02f, 0.035f, 0.06f), 1.5f);
+                        BadgeBrush.OutlineSettings.bUseBrushTransparency = true;
+                        Badge->SetBrush(BadgeBrush);
+                        UCanvasPanelSlot* BadgeSlot = Canvas->AddChildToCanvas(Badge);
+                        BadgeSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+                        BadgeSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+                        BadgeSlot->SetPosition(FVector2D::ZeroVector);
+                        BadgeSlot->SetZOrder(-1);
+                    }
+                }
                 Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
             }
         }
@@ -182,23 +212,34 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
         Slot->SetAlignment(FVector2D(0.5, 0.5));
         Slot->SetPosition(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
             (Radius + (Source.SourceId % 3) * 8.0f * Scale));
-        Slot->SetSize(FVector2D(48.0, 48.0) * Scale);
+        Slot->SetSize(FVector2D(MarkerExtent, MarkerExtent) * Scale);
         const FLinearColor Color = GetCategoryColor(Source.Category);
         if (UImage* Icon = Cast<UImage>(Marker->GetWidgetFromName(TEXT("Image_Icon"))))
         {
             Icon->SetBrushFromTexture(GetIcon(Source.Category));
-            Icon->SetColorAndOpacity(Color);
+            // Original textures have black strokes: preserve them over a coloured badge.
+            Icon->SetColorAndOpacity(FLinearColor::White);
+            if (UCanvasPanelSlot* IconSlot = Cast<UCanvasPanelSlot>(Icon->Slot))
+            {
+                IconSlot->SetSize(FVector2D(IconExtent, IconExtent));
+            }
+        }
+        if (UImage* Badge = Cast<UImage>(Marker->GetWidgetFromName(TEXT("SoundCompassCategoryBadge"))))
+        {
+            Badge->SetColorAndOpacity(Color);
+            if (UCanvasPanelSlot* BadgeSlot = Cast<UCanvasPanelSlot>(Badge->Slot))
+            {
+                BadgeSlot->SetSize(FVector2D(MarkerExtent, MarkerExtent));
+            }
         }
         if (UImage* Wave = Cast<UImage>(Marker->GetWidgetFromName(TEXT("Image_Wave"))))
         {
-            if (UMaterialInstanceDynamic* Material = Wave->GetDynamicMaterial())
-            {
-                Material->SetVectorParameterValue(TEXT("WaveColor"), Color);
-            }
+            // The measured directional trail below replaces the looping marker animation.
+            Wave->SetVisibility(ESlateVisibility::Collapsed);
         }
-        const float Strength = FMath::Clamp((Source.EstimatedListenerDb + 60.0f) / 60.0f, 0.0f, 1.0f);
-        Marker->SetRenderScale(FVector2D(0.60f + Strength * 0.40f));
-        Marker->SetRenderOpacity((0.35f + Strength * 0.65f) * (Source.bOccluded ? 0.65f : 1.0f));
+        // Quiet sounds keep a readable full-size icon throughout the hold period.
+        Marker->SetRenderScale(FVector2D(0.70f + Source.VisualAlpha * 0.30f));
+        Marker->SetRenderOpacity(Source.VisualAlpha * (Source.bOccluded ? 0.80f : 1.0f));
     }
     for (auto It = Markers.CreateIterator(); It; ++It)
     {
@@ -208,7 +249,6 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
             It.RemoveCurrent();
         }
     }
-    InvalidateLayoutAndVolatility();
 }
 
 int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeometry& Geometry,
@@ -249,26 +289,47 @@ int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeom
             const float Angle = 2.0f * PI * Point / 64.0f;
             Circle.Add(Center + FVector2D(FMath::Sin(Angle), FMath::Cos(Angle)) * Radius);
         }
-        Line(Circle, Cyan.CopyWithNewOpacity(0.35f));
-        // The actual mixed output waveform wraps once around the character.
-        // Signed PCM changes the radius; silence leaves a steady reference circle.
-        if (SignalFrame.bReceivingAudio && SignalFrame.Waveform.Num() > 1)
+        Line(Circle, Cyan.CopyWithNewOpacity(0.18f));
+        // Each fixed-width arc uses this source's measured envelope history only.
+        // Keep the captured shape during silence; amplitude and opacity fade together.
+        for (const FSoundCompassSourceFrame& Source : SourceFrames)
         {
-            TArray<FVector2D> Wave;
-            const int32 Points = SignalFrame.Waveform.Num();
+            if (Source.EnvelopeHistory.IsEmpty() || Source.VisualAlpha <= 0.0f) { continue; }
+            float Peak = UE_SMALL_NUMBER;
+            for (const float Value : Source.EnvelopeHistory) { Peak = FMath::Max(Peak, Value); }
+            const float Strength = FMath::Clamp((Source.EstimatedListenerDb + 60.0f) / 60.0f, 0.0f, 1.0f);
+            const float Height = (10.0f + 26.0f * Strength) * Source.VisualAlpha * Scale;
+            const float SourceRadius = Radius + (Source.SourceId % 3) * 8.0f * Scale;
+            TArray<FVector2D> Arc, OuterWave, InnerWave;
+            constexpr int32 Points = 64;
             for (int32 Point = 0; Point <= Points; ++Point)
             {
-                const float Angle = 2.0f * PI * Point / Points;
-                const float Sample = FMath::Clamp(SignalFrame.Waveform[Point % Points] * WaveformGain, -1.0f, 1.0f);
-                Wave.Add(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
-                    (Radius + Sample * 24.0f * Scale));
+                const float Fraction = static_cast<float>(Point) / Points;
+                const float Angle = FMath::DegreesToRadians(SoundCompassPresentation::ArcAngleDegrees(
+                    Source.AzimuthDegrees, WaveformArcDegrees, Fraction));
+                const float SampleIndex = Fraction * (Source.EnvelopeHistory.Num() - 1);
+                const int32 Left = FMath::FloorToInt(SampleIndex);
+                const int32 Right = FMath::Min(Left + 1, Source.EnvelopeHistory.Num() - 1);
+                const float Value = FMath::Lerp(Source.EnvelopeHistory[Left], Source.EnvelopeHistory[Right], SampleIndex - Left);
+                const float Sample = FMath::Clamp(Value / Peak * (WaveformGain / 12.0f), 0.0f, 1.0f);
+                const float Offset = Sample * Height * SoundCompassPresentation::ArcEdgeWeight(Fraction);
+                const FVector2D Direction(FMath::Sin(Angle), -FMath::Cos(Angle));
+                Arc.Add(Center + Direction * SourceRadius);
+                OuterWave.Add(Center + Direction * (SourceRadius + Offset));
+                InnerWave.Add(Center + Direction * (SourceRadius - Offset));
             }
-            Line(Wave, Cyan.CopyWithNewOpacity(0.85f), 1.5f);
+            const FLinearColor Color = GetCategoryColor(Source.Category).CopyWithNewOpacity(
+                Source.VisualAlpha * (Source.bOccluded ? 0.80f : 1.0f));
+            Line(Arc, Color.CopyWithNewOpacity(Color.A * 0.35f), 3.0f);
+            Line(OuterWave, Color, 2.0f);
+            Line(InnerWave, Color.CopyWithNewOpacity(Color.A * 0.65f), 1.5f);
         }
-        Text(Center + FVector2D(-7 * Scale, -Radius - 28 * Scale), TEXT("앞"), Muted);
-        Text(Center + FVector2D(-7 * Scale, Radius + 24 * Scale), TEXT("뒤"), Muted);
-        Text(Center + FVector2D(-Radius - 32 * Scale, -5 * Scale), TEXT("좌"), Muted);
-        Text(Center + FVector2D(Radius + 26 * Scale, -5 * Scale), TEXT("우"), Muted);
+        const float IconExtent = FMath::Clamp(IconSize, 32.0f, 96.0f);
+        const float LabelGap = (IconExtent * 0.5f + 26.0f) * Scale;
+        Text(Center + FVector2D(-7 * Scale, -Radius - LabelGap), TEXT("앞"), Muted);
+        Text(Center + FVector2D(-7 * Scale, Radius + LabelGap - 10 * Scale), TEXT("뒤"), Muted);
+        Text(Center + FVector2D(-Radius - LabelGap, -5 * Scale), TEXT("좌"), Muted);
+        Text(Center + FVector2D(Radius + LabelGap, -5 * Scale), TEXT("우"), Muted);
         const FVector2D Info(Size.X - 310.0 * Scale, 24.0 * Scale);
         Box(Info, FVector2D(286, 86 + FMath::Min(SourceFrames.Num(), 6) * 24) * Scale,
             FLinearColor(0.01f, 0.025f, 0.045f, 0.75f));
@@ -282,7 +343,7 @@ int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeom
             Text(Info + FVector2D(14, 60 + Index * 24) * Scale,
                 FString::Printf(TEXT("%d. %s  %.1fm  중요도 %.0f"), Index + 1,
                     *GetCategoryLabel(Source.Category), Source.DistanceMeters, Source.ImportanceScore * 100.0f),
-                GetCategoryColor(Source.Category));
+                GetCategoryColor(Source.Category).CopyWithNewOpacity(Source.VisualAlpha));
         }
         Text(FVector2D(24 * Scale, Size.Y - 22 * Scale), TEXT("B: 전체/선별   F1: 파형·주파수 분석   V: 표시 켜기/끄기"), Muted, 10);
         for (int32 Index = 0; Index < SourceFrames.Num(); ++Index)
@@ -291,8 +352,8 @@ int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeom
             const float Angle = FMath::DegreesToRadians(Source.AzimuthDegrees);
             const FVector2D Position = Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
                 (Radius + (Source.SourceId % 3) * 8.0f * Scale);
-            Text(Position + FVector2D(14, -20) * Scale, FString::FromInt(Index + 1),
-                GetCategoryColor(Source.Category), 10);
+            Text(Position + FVector2D(IconExtent * 0.5f + 16, -IconExtent * 0.5f - 16) * Scale, FString::FromInt(Index + 1),
+                GetCategoryColor(Source.Category).CopyWithNewOpacity(Source.VisualAlpha), 12);
         }
         if (!MarkerClass)
         {
@@ -301,7 +362,9 @@ int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeom
                 const auto& Source = SourceFrames[Index];
                 const float Angle = FMath::DegreesToRadians(Source.AzimuthDegrees);
                 const FVector2D Position = Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) * Radius;
-                Box(Position - FVector2D(5, 5) * Scale, FVector2D(10, 10) * Scale, GetCategoryColor(Source.Category));
+                const float Extent = FMath::Clamp(IconSize, 32.0f, 96.0f) * Source.VisualAlpha;
+                Box(Position - FVector2D(Extent * 0.5f) * Scale, FVector2D(Extent) * Scale,
+                    GetCategoryColor(Source.Category).CopyWithNewOpacity(Source.VisualAlpha));
             }
         }
     }

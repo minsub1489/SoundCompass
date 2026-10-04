@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AudioDeviceHandle.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "SoundVisualization/SoundPresentation.h"
 #include "SoundVisualizationSubsystem.generated.h"
 
 class UAudioComponent;
@@ -33,6 +34,10 @@ struct FSoundCompassSourceFrame
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float DistanceMeters = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float ElevationMeters = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float SourceEnvelope = 0.0f;
+    /** Smooth presentation weight; held levels remain separate from the fade. */
+    UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float VisualAlpha = 0.0f;
+    /** Measured per-source envelope history, retained when the sound ends. */
+    UPROPERTY(BlueprintReadOnly, Category="Sound Compass") TArray<float> EnvelopeHistory;
     /** Estimate using the measured envelope, distance curve, and an occlusion trace. */
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float EstimatedListenerLevel = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float EstimatedListenerDb = -80.0f;
@@ -92,7 +97,7 @@ public:
         USoundAttenuation* Attenuation = nullptr, float Volume = 1.0f, float Pitch = 1.0f,
         AActor* SourceOwner = nullptr, float ImportanceOverride = -1.0f);
 
-    /** All audible candidates, ordered by importance. No Top-K filtering here. */
+    /** Audible and briefly retained candidates, ordered by importance. */
     UFUNCTION(BlueprintPure, Category="Sound Compass")
     TArray<FSoundCompassSourceFrame> GetSourceFrames(APlayerController* Listener) const;
 
@@ -115,7 +120,10 @@ public:
     float SourceThresholdDb = -60.0f;
 
     UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="0.0"))
-    float MarkerHoldSeconds = 0.35f;
+    float MarkerHoldSeconds = 0.60f;
+
+    UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="0.0"))
+    float MarkerFadeSeconds = 0.80f;
 
     UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="1", ClampMax="512"))
     int32 MaxTrackedSources = 128;
@@ -152,6 +160,7 @@ private:
         FTransform Transform;
         float Envelope = 0.0f;
         double LastEnvelopeTime = 0.0;
+        SoundCompassPresentation::EnvelopeTrail Presentation;
         double StoppedTime = -1.0;
         bool bReceivedEnvelope = false;
         bool bEverPlayed = false;
