@@ -133,11 +133,11 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
     }
     const FVector2D Center = RingCenter;
     const float Radius = FMath::Clamp(RingRadius, 80.0f, 400.0f) * Scale;
-    if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(CenterRing->Slot))
+    if (UCanvasPanelSlot* RingSlot = Cast<UCanvasPanelSlot>(CenterRing->Slot))
     {
-        Slot->SetAlignment(FVector2D(0.5, 0.5));
-        Slot->SetPosition(Center);
-        Slot->SetSize(FVector2D(Radius / 0.42f, Radius / 0.42f));
+        RingSlot->SetAlignment(FVector2D(0.5, 0.5));
+        RingSlot->SetPosition(Center);
+        RingSlot->SetSize(FVector2D(Radius / 0.42f, Radius / 0.42f));
     }
     CenterRing->SetVisibility(bShowCompass ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     TSet<int32> ActiveIds;
@@ -178,11 +178,11 @@ void USoundVisualizationWidget::NativeTick(const FGeometry& MyGeometry, float In
         }
         if (!Marker) { continue; }
         const float Angle = FMath::DegreesToRadians(Source.AzimuthDegrees);
-        UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Marker->Slot);
-        Slot->SetAlignment(FVector2D(0.5, 0.5));
-        Slot->SetPosition(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
+        UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(Marker->Slot);
+        MarkerSlot->SetAlignment(FVector2D(0.5, 0.5));
+        MarkerSlot->SetPosition(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
             (Radius + (Source.SourceId % 3) * 8.0f * Scale));
-        Slot->SetSize(FVector2D(48.0, 48.0) * Scale);
+        MarkerSlot->SetSize(FVector2D(48.0, 48.0) * Scale);
         const FLinearColor Color = GetCategoryColor(Source.Category);
         if (UImage* Icon = Cast<UImage>(Marker->GetWidgetFromName(TEXT("Image_Icon"))))
         {
