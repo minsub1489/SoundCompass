@@ -1,3 +1,17 @@
+<!-- MINSUB-BRAND:START -->
+<p align="center">
+  <a href="https://minsub-kim-portfolio.vercel.app/projects/soundcompass/"><img src=".github/assets/banner.svg" width="1200" alt="SoundCompass · Hear the world. See what matters."></a>
+</p>
+<p align="center">
+  <a href="https://minsub-kim-portfolio.vercel.app/"><img src=".github/assets/portfolio.svg" width="240" alt="Minsub Kim 포트폴리오 보기"></a>
+</p>
+<p align="center">
+  <a href="https://minsub-kim-portfolio.vercel.app/projects/soundcompass/">프로젝트 스토리</a> · <a href="https://github.com/minsub1489">개발자 프로필</a> · <a href="https://minsub-kim-portfolio.vercel.app/">포트폴리오</a>
+</p>
+<!-- MINSUB-BRAND:END -->
+
+---
+
 # SoundCompass
 
 게임공학 프로젝트의 **동시 발생 소리의 중요도 선별 시각화** 기능입니다. Unreal Engine **5.8**에서 실행합니다.
