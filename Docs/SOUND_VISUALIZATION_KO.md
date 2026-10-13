@@ -6,7 +6,7 @@
 
 참고 연구는 Jain et al., *Towards Sound Accessibility in Virtual Reality*, ICMI 2021, [원문 PDF](https://www.microsoft.com/en-us/research/wp-content/uploads/2021/08/towards_sound_accessibility_in_virtual_reality_icmi_2021.pdf), DOI: [10.1145/3462244.3479946](https://doi.org/10.1145/3462244.3479946)입니다. 연구는 모든 소리를 우선순위에 따라 표시하는 프로토타입을 제시하고, 동시 피드백의 인지 부하 문제를 후속 연구 과제로 다룹니다.
 
-이 프로젝트에서는 이를 바탕으로 **전체 표시 조건과 중요도 기준·상위 K개 선별 조건**을 비교할 수 있게 구현했습니다. 아래 점수식·가중치·상위 3개는 프로젝트 구현을 위한 초기 설정이며, 논문에서 검증한 수치나 기존 대화에서 확정한 실험 결과가 아닙니다. 음량 자체를 변경하는 오디오 믹싱 기능은 추가하지 않았습니다.
+이 프로젝트에서는 이를 바탕으로 **전체 표시 조건과 중요도 기준·상위 K개 선별 조건**을 비교할 수 있게 구현했습니다. 아래 점수식·가중치·상위 3개는 프로젝트 구현을 위한 초기 설정이며, 논문에서 검증한 수치나 기존 대화에서 확정한 실험 결과가 아닙니다. 공간 음원에는 아래의 raycast 기반 가림 감쇠를 적용합니다.
 
 ## 실행과 화면
 
@@ -110,13 +110,35 @@
 
 위젯의 `RingRadius`·`WaveformGain`으로 원 크기와 파형 배율, `WaveformArcDegrees`로 방향 범위(기본 50°, 10~120°), `IconSize`로 아이콘 크기(기본 52, 32~96)를 바꿀 수 있습니다. PlayerController Blueprint의 **Sound Compass**에서 네이티브 위젯의 자식 클래스를 지정해 조정하거나 자체 위젯으로 대체할 수 있습니다.
 
+## Raycast 기반 실제 소리 감쇠
+
+`RegisterAudioComponent`와 `PlayVisualizedSound`로 등록된 공간 음원에 Unreal의 native occlusion을 적용합니다. 청취자와 음원 사이를 line trace로 검사해 벽이나 닫힌 문이 경로를 막으면 실제 재생 음량과 저역 통과 필터를 조절합니다. 가림이 해제되면 원래 음량과 필터로 부드럽게 복원합니다. 기본값은 다음과 같으며 `Config/DefaultGame.ini`의 `SoundVisualizationSubsystem` 섹션에서 바꿀 수 있습니다.
+
+| 설정 | 기본값 | 용도 |
+| --- | --- | --- |
+| `bEnableRaycastOcclusion` | `True` | 가림 설정이 없는 공간 음원에 기본 감쇠 추가 |
+| `OcclusionTraceChannel` | `ECC_Visibility` | 경로를 막는 충돌 채널 |
+| `OccludedVolumeMultiplier` | `0.35` | 가려졌을 때 음량 배율, 약 −9.1 dB |
+| `OccludedLowPassFrequencyHz` | `1500` | 가려졌을 때 고음역을 줄이는 필터 주파수 |
+| `OcclusionInterpolationSeconds` | `0.15` | 가림 변화 시 보간 시간 |
+| `OcclusionCheckIntervalSeconds` | `0.10` | 재생 중 경로 재검사 간격 |
+| `bUseComplexOcclusionCollision` | `False` | 단순 충돌 사용, 필요 시 복잡 충돌로 변경 |
+
+설정은 **등록 시** 적용됩니다. 소리가 시작되기 전에 연결하므로 짧은 단발음도 최초 재생부터 검사합니다. 이미 재생 중인 환경음도 재시작 없이 적용합니다. 기존 거리 감쇠·음량 배율을 유지하고, 거리 설정이 없는 소리에는 새로운 거리 falloff를 추가하지 않습니다. 음원에 `bEnableOcclusion`이 이미 켜져 있으면 해당 음원의 채널·음량·필터·보간 설정을 그대로 사용합니다. UI 소리와 공간화가 꺼진 음원에는 기본 감쇠를 추가하지 않습니다. 추적 해제 시 임시 설정을 복원합니다.
+
+벽과 문 패널의 충돌 응답은 설정 채널에 **Block**이어야 합니다. `SoundTestDoor`의 문 패널은 Visibility를 막고, 이동만 제한하는 보조 Box는 Visibility를 무시하므로 열린 문으로 소리가 통과합니다. 단발음도 원래 소리를 낸 액터를 native 검사에서 제외해 문이 자기 자신의 문소리를 막지 않습니다.
+
+`GetSourceFrames`의 `bOccluded`, `OcclusionGain`, `OcclusionLowPassHz`는 UI trace에서 얻은 **목표값**입니다. `EstimatedListenerLevel`은 거리와 가림 배율을 각각 한 번 적용한 추정값이며 중요도와 방향 파형 높이에 반영합니다. 실제 재생은 오디오 엔진에서 별도로 검사·보간하므로 전환 중에는 추정값과 잠시 차이가 날 수 있습니다. 전체 출력 PCM 분석은 감쇠 후 실제 소리입니다. 이 기능은 경로의 차단 여부를 검사하며, 벽 두께·재질·다중 반사·회절을 계산하지 않습니다. Unreal의 [공식 occlusion 설명](https://dev.epicgames.com/documentation/unreal-engine/sound-attenuation-in-unreal-engine)을 참고하세요.
+
+Development 게임 콘솔에서 `SoundCompass.OcclusionTest`를 실행하면 장애물 생성·채널 무시·제거, 실제 오디오 스레드의 음량·필터, 재생 전/후 등록, 음원 자신의 충돌 제외, 기존 설정 보존과 복원을 검사합니다. `-SoundCompassExitAfterOcclusionTest`를 지정하면 검사 후 종료합니다. `SoundCompass.Dump` 로그에는 가림 배율과 필터 주파수도 출력됩니다.
+
 ## UI 담당자용 Blueprint API
 
 `Get World Subsystem` → `SoundVisualizationSubsystem`을 사용합니다.
 
 | API | 용도 |
 | --- | --- |
-| `Get Source Frames(PlayerController)` | 가청·유지·감쇠 중인 후보. 종류·각도·거리·크기·가림·중요도·VisualAlpha·EnvelopeHistory 포함 |
+| `Get Source Frames(PlayerController)` | 가청·유지·감쇠 중인 후보. 종류·각도·거리·크기·가림·OcclusionGain·OcclusionLowPassHz·중요도·VisualAlpha·EnvelopeHistory 포함 |
 | `Select Source Frames(Candidates)` | 현재 표시 조건에 따라 후보 배열 선별 |
 | `Get Visualization Frames(PlayerController)` | 가청 후보 수집과 선별을 한 번에 수행 |
 | `Get Signal Frame()` | 전체 출력의 RMS·Peak·dBFS·주파수·Waveform·SpectrumDb·FrequenciesHz |
