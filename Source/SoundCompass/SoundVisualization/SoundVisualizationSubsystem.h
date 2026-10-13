@@ -46,6 +46,9 @@ struct FSoundCompassSourceFrame
     /** Normalised project policy score: semantic importance, proximity, and loudness. */
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float ImportanceScore = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") bool bOccluded = false;
+    /** Target gain from the raycast; Unreal interpolates actual playback to this value. */
+    UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float OcclusionGain = 1.0f;
+    UPROPERTY(BlueprintReadOnly, Category="Sound Compass") float OcclusionLowPassHz = 20000.0f;
     UPROPERTY(BlueprintReadOnly, Category="Sound Compass") bool bPlaying = false;
 };
 
@@ -149,6 +152,22 @@ public:
     UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category="Sound Compass|Importance", meta=(ClampMin="0.01", Units="m"))
     float ProximityRangeMeters = 20.0f;
 
+    /** Defaults for spatial sources without authored occlusion. Applied at registration. */
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion")
+    bool bEnableRaycastOcclusion = true;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion")
+    TEnumAsByte<ECollisionChannel> OcclusionTraceChannel = ECC_Visibility;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float OccludedVolumeMultiplier = 0.35f;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion", meta=(ClampMin="20.0", ClampMax="20000.0", Units="Hz"))
+    float OccludedLowPassFrequencyHz = 1500.0f;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion", meta=(ClampMin="0.0", Units="s"))
+    float OcclusionInterpolationSeconds = 0.15f;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion", meta=(ClampMin="0.01", Units="s"))
+    float OcclusionCheckIntervalSeconds = 0.10f;
+    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Sound Compass|Occlusion")
+    bool bUseComplexOcclusionCollision = false;
+
 private:
     struct FTrackedSource
     {
@@ -167,12 +186,18 @@ private:
         bool bPlaying = false;
         bool bHasAttenuation = false;
         TSharedPtr<struct FSoundAttenuationSettings> Attenuation;
+        bool bAppliedOcclusionDefaults = false;
+        bool bOriginalOverrideAttenuation = false;
+        float OriginalOcclusionCheckInterval = 0.0f;
+        TSharedPtr<struct FSoundAttenuationSettings> OriginalAttenuation;
+        TSharedPtr<struct FSoundAttenuationSettings> OriginalOverrides;
     };
 
     void HandleEnvelope(const UAudioComponent* Audio, const class USoundWave* Wave, float Value);
     void StartCapture();
     void UpdateSignal(float DeltaTime);
     void RemoveSource(int32 Index);
+    void ConfigureOcclusion(UAudioComponent* Audio, FTrackedSource& Source);
 
     TArray<FTrackedSource> Sources;
     int32 NextSourceId = 1;

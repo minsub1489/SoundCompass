@@ -1,5 +1,30 @@
 # 검증 기록
 
+## Raycast 소리 감쇠 — 2026-10-13 (Asia/Seoul)
+
+- 기준 브랜치: `codex/directional-sound-ui` / `c70943b`. 최신 `main` 커밋 `c551f2a`는 문서 변경으로, 최신 게임 기능을 가진 브랜치에서 이어서 구현했습니다.
+- Unreal Engine 5.8.2 / SoundCompassEditor / Mac / Development 빌드 성공.
+- 기존 표준 C++ 검사: 신호·중요도 47개, 방향 표시·유지·감쇠 32개 모두 통과.
+- 기존 맵의 실제 게임 실행: 출력 PCM·방향·HUD·중요도 선별·짧은 발소리 유지·감쇠 회귀 검사 통과.
+- `SoundCompass.OcclusionTest`: 실제 오디오 스레드의 재생 gain·필터를 읽어 검사. 재생 전 등록과 이미 재생 중인 음원 등록 모두 통과.
+- 기존 거리 설정·볼륨·명시적 occlusion 보존, UI·비공간 음원 제외, 중복 등록, 기본 감쇠 비활성화, 추적 해제 시 설정 복원 검사 통과.
+- 벽·문과 동일한 Visibility 차단용 Box, 채널 무시, 제거, 소리 발생 액터 자신의 충돌 제외 검사 통과. UI 추정 배율은 가림 감쇠를 한 번만 반영.
+- Windows 빌드와 참가자 평가는 이번 검증에 포함되지 않음.
+
+```text
+SoundCompass occlusion stage: clear PASS nativeGain=1.000 lateGain=1.000 lowpass=20000Hz frameGain=1.000
+SoundCompass occlusion stage: blocked PASS nativeGain=0.350 lateGain=0.350 lowpass=1500Hz frameGain=0.350
+SoundCompass occlusion stage: channel-ignore PASS nativeGain=1.000 lateGain=1.000 lowpass=20000Hz frameGain=1.000
+SoundCompass occlusion stage: removed PASS nativeGain=1.000 lateGain=1.000 lowpass=20000Hz frameGain=1.000
+SoundCompass occlusion test: PASS
+SoundCompass smoke test: PASS audio=1 direction=1 hud=1 priority=1 baseline=1 characterCenter=1 diagnostics=1 categoryRules=1 readableIcons=1 candidates=6 selected=3 RMS=0.03885 rate=48000 channels=2
+SoundCompass retention test: PASS hold=1 fade=1 removed=1
+```
+
+위 결과는 제어된 런타임 검사이며, 벽 재질·회절을 포함한 물리적 음향 시뮬레이션이나 청취 실험 결과는 아닙니다.
+
+## 방향 파형과 표시 유지·감쇠 — 2026-10-05
+
 - 검증일: 2026-10-05 (Asia/Seoul)
 - 엔진: Unreal Engine 5.8.2
 - 빌드: SoundCompassEditor / Mac / Development — Succeeded

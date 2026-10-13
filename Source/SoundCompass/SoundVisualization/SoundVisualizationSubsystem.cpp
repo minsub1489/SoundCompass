@@ -150,6 +150,7 @@ int32 USoundVisualizationSubsystem::RegisterAudioComponent(UAudioComponent* Audi
         Source.Attenuation = MakeShared<FSoundAttenuationSettings>(*Settings);
         Source.bHasAttenuation = true;
     }
+    ConfigureOcclusion(Audio, Source);
     Audio->OnAudioSingleEnvelopeValueNative.AddUObject(this, &USoundVisualizationSubsystem::HandleEnvelope);
     // AmbientSound can already be playing when a streamed actor is discovered.
     // Enable updates on the active voice without restarting or duplicating playback.
@@ -163,11 +164,82 @@ int32 USoundVisualizationSubsystem::RegisterAudioComponent(UAudioComponent* Audi
     return Source.Id;
 }
 
+void USoundVisualizationSubsystem::ConfigureOcclusion(UAudioComponent* Audio, FTrackedSource& Source)
+{
+    // Keep UI/non-spatial audio and intentionally authored occlusion untouched.
+    if (!bEnableRaycastOcclusion || Audio->bIsUISound || !Audio->bAllowSpatialization ||
+        (Source.Attenuation && (!Source.Attenuation->bSpatialize || Source.Attenuation->bEnableOcclusion)))
+    {
+        return;
+    }
+    Source.bAppliedOcclusionDefaults = true;
+    Source.bOriginalOverrideAttenuation = Audio->bOverrideAttenuation;
+    Source.OriginalOcclusionCheckInterval = Audio->OcclusionCheckInterval;
+    Source.OriginalAttenuation = Source.Attenuation;
+    Source.OriginalOverrides = MakeShared<FSoundAttenuationSettings>(Audio->AttenuationOverrides);
+
+    FSoundAttenuationSettings Settings;
+    if (Source.Attenuation) { Settings = *Source.Attenuation; }
+    else
+    {
+        // Adding occlusion must not introduce a new distance falloff or reverb send.
+        Settings.bAttenuate = false;
+        Settings.bEnableReverbSend = false;
+    }
+    Settings.bEnableOcclusion = true;
+    Settings.OcclusionTraceChannel = OcclusionTraceChannel;
+    Settings.bUseComplexCollisionForOcclusion = bUseComplexOcclusionCollision;
+    Settings.OcclusionVolumeAttenuation = FMath::IsFinite(OccludedVolumeMultiplier) ?
+        FMath::Clamp(OccludedVolumeMultiplier, 0.0f, 1.0f) : 0.35f;
+    Settings.OcclusionLowPassFilterFrequency = FMath::IsFinite(OccludedLowPassFrequencyHz) ?
+        FMath::Clamp(OccludedLowPassFrequencyHz, 20.0f, 20000.0f) : 1500.0f;
+    Settings.OcclusionInterpolationTime = FMath::IsFinite(OcclusionInterpolationSeconds) ?
+        FMath::Max(0.0f, OcclusionInterpolationSeconds) : 0.15f;
+    const float Interval = FMath::IsFinite(OcclusionCheckIntervalSeconds) ?
+        FMath::Max(0.01f, OcclusionCheckIntervalSeconds) : 0.10f;
+    Audio->OcclusionCheckInterval = Interval;
+    Audio->AdjustAttenuation(Settings);
+    Source.Attenuation = MakeShared<FSoundAttenuationSettings>(Settings);
+    Source.bHasAttenuation = true;
+
+    // Streamed ambient sources may already be playing without attenuation settings.
+    // AdjustAttenuation alone does not enable that active voice's settings flag.
+    if (FAudioDevice* Device = Audio->GetAudioDevice())
+    {
+        Device->SendCommandToActiveSounds(Audio->GetAudioComponentID(), [Interval](FActiveSound& ActiveSound)
+        {
+            ActiveSound.bHasAttenuationSettings = true;
+            ActiveSound.OcclusionCheckInterval = Interval;
+        });
+    }
+}
+
 void USoundVisualizationSubsystem::RemoveSource(int32 Index)
 {
-    if (UAudioComponent* Audio = Sources[Index].Audio.Get())
+    const FTrackedSource& Source = Sources[Index];
+    if (UAudioComponent* Audio = Source.Audio.Get())
     {
         Audio->OnAudioSingleEnvelopeValueNative.RemoveAll(this);
+        if (Source.bAppliedOcclusionDefaults)
+        {
+            // Restore the component and its running voice without restarting playback.
+            const bool bHadSettings = Source.OriginalAttenuation.IsValid();
+            const FSoundAttenuationSettings Original = bHadSettings ?
+                *Source.OriginalAttenuation : FSoundAttenuationSettings();
+            Audio->AdjustAttenuation(Original);
+            Audio->AttenuationOverrides = *Source.OriginalOverrides;
+            Audio->bOverrideAttenuation = Source.bOriginalOverrideAttenuation;
+            Audio->OcclusionCheckInterval = Source.OriginalOcclusionCheckInterval;
+            if (FAudioDevice* Device = Audio->GetAudioDevice())
+            {
+                Device->SendCommandToActiveSounds(Audio->GetAudioComponentID(),
+                    [bHadSettings, Interval = Source.OriginalOcclusionCheckInterval](FActiveSound& ActiveSound)
+                {
+                    ActiveSound.bHasAttenuationSettings = bHadSettings;
+                    ActiveSound.OcclusionCheckInterval = Interval;
+                });
+            }
+        }
     }
     Sources.RemoveAtSwap(Index);
 }
@@ -188,7 +260,9 @@ UAudioComponent* USoundVisualizationSubsystem::PlayVisualizedSound(USoundBase* S
     {
         return nullptr;
     }
-    FAudioDevice::FCreateComponentParams Params(GetWorld());
+    // Native occlusion ignores the source actor, including its own door/prop mesh.
+    FAudioDevice::FCreateComponentParams Params(GetWorld(),
+        IsValid(SourceOwner) && SourceOwner->GetWorld() == GetWorld() ? SourceOwner : nullptr);
     Params.SetLocation(Location);
     Params.AttenuationSettings = Attenuation;
     Params.bPlay = false;
@@ -362,7 +436,12 @@ TArray<FSoundCompassSourceFrame> USoundVisualizationSubsystem::GetSourceFrames(A
                 if (Listener->GetPawn()) { Query.AddIgnoredActor(Listener->GetPawn()); }
                 Frame.bOccluded = GetWorld()->LineTraceTestByChannel(Location, Frame.WorldLocation,
                     Settings.OcclusionTraceChannel, Query);
-                if (Frame.bOccluded) { Gain *= Settings.OcclusionVolumeAttenuation; }
+                if (Frame.bOccluded)
+                {
+                    Frame.OcclusionGain = FMath::Clamp(Settings.OcclusionVolumeAttenuation, 0.0f, 1.0f);
+                    Frame.OcclusionLowPassHz = Settings.OcclusionLowPassFilterFrequency;
+                    Gain *= Frame.OcclusionGain;
+                }
             }
         }
         Frame.EstimatedListenerLevel = FMath::Max(0.0f, Envelope * Gain);
@@ -451,9 +530,10 @@ static FAutoConsoleCommandWithWorld DumpSoundCompass(
                 Frames.Num(), Selected.Num(), System->MaxImportantSources, System->ImportanceThreshold);
             for (const auto& Frame : Frames)
             {
-                UE_LOG(LogSoundCompass, Display, TEXT("SoundCompass source: id=%d category=%s bearing=%.1f distance=%.2fm envelope=%.5f estimated=%.1fdB importance=%.3f base=%.2f occluded=%d"),
+                UE_LOG(LogSoundCompass, Display, TEXT("SoundCompass source: id=%d category=%s bearing=%.1f distance=%.2fm envelope=%.5f estimated=%.1fdB importance=%.3f base=%.2f occluded=%d occlusionGain=%.2f lowpass=%.0fHz"),
                     Frame.SourceId, *Frame.Category.ToString(), Frame.AzimuthDegrees, Frame.DistanceMeters,
-                    Frame.SourceEnvelope, Frame.EstimatedListenerDb, Frame.ImportanceScore, Frame.BaseImportance, Frame.bOccluded);
+                    Frame.SourceEnvelope, Frame.EstimatedListenerDb, Frame.ImportanceScore, Frame.BaseImportance,
+                    Frame.bOccluded, Frame.OcclusionGain, Frame.OcclusionLowPassHz);
             }
         }
     }));
