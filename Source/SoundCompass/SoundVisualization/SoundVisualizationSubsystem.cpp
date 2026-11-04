@@ -17,6 +17,7 @@
 #include "Sound/SoundBase.h"
 #include "Sound/SoundSubmix.h"
 #include "Sound/AmbientSound.h"
+#include "UObject/UObjectIterator.h"
 
 /** Owns only PCM, never game objects; mixer commands keep its shared reference alive. */
 class FSoundCompassBufferListener final : public ISubmixBufferListener
@@ -309,17 +310,23 @@ void USoundVisualizationSubsystem::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     if (!GetWorld()->HasBegunPlay() || GetWorld()->GetNetMode() == NM_DedicatedServer) { return; }
     AmbientDiscoveryTime += DeltaTime;
-    if (AmbientDiscoveryTime >= 1.0f)
+    // shortcut: polling misses one-shots shorter than 0.1s, and PlaySoundAtLocation has no component to find.
+    if (AmbientDiscoveryTime >= 0.1f)
     {
         AmbientDiscoveryTime = 0.0f;
-        for (TActorIterator<AAmbientSound> It(GetWorld()); It; ++It)
+        for (TObjectIterator<UAudioComponent> It; It; ++It)
         {
-            UAudioComponent* Audio = It->GetAudioComponent();
+            UAudioComponent* Audio = *It;
+            if (Audio->GetWorld() != GetWorld() || !Audio->IsPlaying()) { continue; }
+            const bool bAmbient = Audio->GetOwner() && Audio->GetOwner()->IsA<AAmbientSound>();
+            // Without attenuation the sound is 2D (UI, music) and has no direction to show.
+            if (!bAmbient && !Audio->GetAttenuationSettingsToApply()) { continue; }
             // Preserve explicit metadata supplied by Blueprint/UI integration.
-            if (Audio && !Sources.ContainsByPredicate([Audio](const FTrackedSource& Source)
+            if (!Sources.ContainsByPredicate([Audio](const FTrackedSource& Source)
                 { return Source.Audio == Audio; }))
             {
-                RegisterAudioComponent(Audio, TEXT("Ambience"), *It);
+                RegisterAudioComponent(Audio, bAmbient ? FName(TEXT("Ambience")) :
+                    SoundCompassCategory(Audio->Sound ? Audio->Sound->GetFName() : NAME_None));
             }
         }
     }

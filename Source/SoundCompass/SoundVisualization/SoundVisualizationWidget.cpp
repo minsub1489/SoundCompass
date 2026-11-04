@@ -28,6 +28,16 @@ FString Kind(FName Category)
 {
     return SoundCompassCategory(Category).ToString();
 }
+
+// Behind a wall: keep the hue so the category stays readable, but wash it out and darken it.
+FLinearColor Occluded(const FLinearColor& Color, bool bOccluded)
+{
+    if (!bOccluded) { return Color; }
+    FLinearColor Hsv = Color.LinearRGBToHSV();
+    Hsv.G *= 0.30f;
+    Hsv.B *= 0.60f;
+    return Hsv.HSVToLinearRGB().CopyWithNewOpacity(Color.A);
+}
 }
 
 USoundVisualizationWidget::USoundVisualizationWidget(const FObjectInitializer& ObjectInitializer)
@@ -40,7 +50,8 @@ USoundVisualizationWidget::USoundVisualizationWidget(const FObjectInitializer& O
     const TPair<const TCHAR*, const TCHAR*> Paths[] = {
         {TEXT("Gunshot"), TEXT("Ariel_Bullet")}, {TEXT("Explosion"), TEXT("Ariel_Grenade")},
         {TEXT("Footstep"), TEXT("Ariel_Footprint")}, {TEXT("Door"), TEXT("Ariel_Door")},
-        {TEXT("Noise"), TEXT("Ariel_Wheel")}, {TEXT("Ambience"), TEXT("Ariel_Airplane")}
+        {TEXT("Noise"), TEXT("Ariel_Wheel")}, {TEXT("Ambience"), TEXT("Ariel_Airplane")},
+        {TEXT("GlassBreak"), TEXT("Ariel_GlassBreak")}, {TEXT("Throw"), TEXT("Ariel_Throw")}
     };
     for (const auto& Path : Paths)
     {
@@ -91,6 +102,8 @@ FLinearColor USoundVisualizationWidget::GetCategoryColor(FName Category)
     if (Name == TEXT("Conversation")) { return FLinearColor(0.80f, 0.50f, 1.0f); }
     if (Name == TEXT("Alert")) { return FLinearColor(1.0f, 0.92f, 0.20f); }
     if (Name == TEXT("Ambience")) { return FLinearColor(1.0f, 0.45f, 0.78f); }
+    if (Name == TEXT("GlassBreak")) { return FLinearColor(0.90f, 0.95f, 1.0f); }
+    if (Name == TEXT("Throw")) { return FLinearColor(0.72f, 0.52f, 0.32f); }
     return FLinearColor(0.25f, 0.83f, 0.90f);
 }
 
@@ -105,6 +118,8 @@ FString USoundVisualizationWidget::GetCategoryLabel(FName Category)
     if (Name == TEXT("Conversation")) { return TEXT("대화"); }
     if (Name == TEXT("Ambience")) { return TEXT("환경음"); }
     if (Name == TEXT("Alert")) { return TEXT("경고음"); }
+    if (Name == TEXT("GlassBreak")) { return TEXT("유리 깨짐"); }
+    if (Name == TEXT("Throw")) { return TEXT("투척물"); }
     return TEXT("소음");
 }
 
@@ -213,7 +228,7 @@ void USoundVisualizationWidget::UpdateMarkers(const FGeometry& MyGeometry)
         MarkerSlot->SetPosition(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) *
             (Radius + (Source.SourceId % 3) * 8.0f * Scale));
         MarkerSlot->SetSize(FVector2D(MarkerExtent, MarkerExtent) * Scale);
-        const FLinearColor Color = GetCategoryColor(Source.Category);
+        const FLinearColor Color = Occluded(GetCategoryColor(Source.Category), Source.bOccluded);
         if (UImage* Icon = Cast<UImage>(Marker->GetWidgetFromName(TEXT("Image_Icon"))))
         {
             Icon->SetBrushFromTexture(GetIcon(Source.Category));
@@ -239,7 +254,7 @@ void USoundVisualizationWidget::UpdateMarkers(const FGeometry& MyGeometry)
         }
         // Quiet sounds keep a readable full-size icon throughout the hold period.
         Marker->SetRenderScale(FVector2D(0.70f + Source.VisualAlpha * 0.30f));
-        Marker->SetRenderOpacity(Source.VisualAlpha * (Source.bOccluded ? 0.80f : 1.0f));
+        Marker->SetRenderOpacity(Source.VisualAlpha);
     }
     for (auto It = Markers.CreateIterator(); It; ++It)
     {
@@ -318,8 +333,8 @@ int32 USoundVisualizationWidget::NativePaint(const FPaintArgs& Args, const FGeom
                 OuterWave.Add(Center + Direction * (SourceRadius + Offset));
                 InnerWave.Add(Center + Direction * (SourceRadius - Offset));
             }
-            const FLinearColor Color = GetCategoryColor(Source.Category).CopyWithNewOpacity(
-                Source.VisualAlpha * (Source.bOccluded ? 0.80f : 1.0f));
+            const FLinearColor Color = Occluded(GetCategoryColor(Source.Category), Source.bOccluded)
+                .CopyWithNewOpacity(Source.VisualAlpha);
             Line(Arc, Color.CopyWithNewOpacity(Color.A * 0.35f), 3.0f);
             Line(OuterWave, Color, 2.0f);
             Line(InnerWave, Color.CopyWithNewOpacity(Color.A * 0.65f), 1.5f);
