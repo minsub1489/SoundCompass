@@ -181,7 +181,7 @@ static void RunSoundCompassSmokeTest(UWorld* World)
             Hud->ToggleDiagnostics();
             DiagnosticsPass &= !Hud->bShowSignal && !Hud->bShowSourceList;
         }
-        const bool RulesPass = TestSystem->CategoryImportance.Num() == 8 &&
+        const bool RulesPass = TestSystem->CategoryImportance.Num() == 10 &&
             TestSystem->CategoryImportance.FindRef(TEXT("Gunshot")) > TestSystem->CategoryImportance.FindRef(TEXT("Ambience")) &&
             TestSystem->CategoryImportance.FindRef(TEXT("Footstep")) > TestSystem->CategoryImportance.FindRef(TEXT("Ambience"));
         bool IconPass = false;
