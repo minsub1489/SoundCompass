@@ -218,6 +218,13 @@ void USoundVisualizationSubsystem::HandleEnvelope(const UAudioComponent* Audio, 
             Source.LastEnvelopeTime = GetWorld()->GetTimeSeconds();
             Source.bReceivedEnvelope = true;
             Source.bEverPlayed = true;
+            if (!Audio->bIsVirtualized && Audio->GetPlayState() != EAudioComponentPlayState::Paused &&
+                Source.Presentation.Observe(Source.Envelope, Source.LastEnvelopeTime,
+                    FMath::Pow(10.0f, SourceThresholdDb / 20.0f), MarkerHoldSeconds, MarkerFadeSeconds))
+            {
+                // Cache here as well: a short auto-destroyed one-shot may end before Tick.
+                Source.Transform = Audio->GetComponentTransform();
+            }
             return;
         }
     }
@@ -258,7 +265,9 @@ void USoundVisualizationSubsystem::Tick(float DeltaTime)
         // Paused/virtualised loops may become audible again; retain their registration.
         if (Audio && Audio->IsPlaying()) { Source.StoppedTime = -1.0; }
         else if (Source.StoppedTime < 0.0) { Source.StoppedTime = Now; }
-        if (Source.StoppedTime >= 0.0 && Now - Source.StoppedTime > FMath::Max(0.0f, MarkerHoldSeconds))
+        const double RetentionStart = FMath::Max(Source.StoppedTime, Source.Presentation.LastAudibleTime);
+        if (Source.StoppedTime >= 0.0 && Now - RetentionStart >
+            FMath::Max(0.0f, MarkerHoldSeconds) + FMath::Max(0.0f, MarkerFadeSeconds))
         {
             RemoveSource(Index);
         }
@@ -319,14 +328,11 @@ TArray<FSoundCompassSourceFrame> USoundVisualizationSubsystem::GetSourceFrames(A
     for (const FTrackedSource& Source : Sources)
     {
         if (!Source.bReceivedEnvelope) { continue; }
-        if (const UAudioComponent* Audio = Source.Audio.Get())
-        {
-            if (Audio->bIsVirtualized || Audio->GetPlayState() == EAudioComponentPlayState::Paused) { continue; }
-        }
-        const double Age = FMath::Max(0.0, Now - Source.LastEnvelopeTime);
-        // Age out a stale envelope: no invented amplitude for silent or virtualised sources.
-        const float Envelope = Source.Envelope * FMath::Exp(-FMath::Max(0.0, Age - 0.08) * 12.0);
-        if (SoundCompassSignal::Decibels(Envelope) < SourceThresholdDb) { continue; }
+        const float VisualAlpha = Source.Presentation.Visibility(Now, MarkerHoldSeconds, MarkerFadeSeconds);
+        if (VisualAlpha <= 0.0f) { continue; }
+        // Selection uses the retained measurement, not the shrinking presentation weight.
+        // Otherwise quiet one-shots would drop below the threshold before their fade ends.
+        const float Envelope = Source.Presentation.HeldEnvelope;
         FSoundCompassSourceFrame Frame;
         Frame.SourceId = Source.Id;
         Frame.Category = Source.Category;
@@ -338,6 +344,12 @@ TArray<FSoundCompassSourceFrame> USoundVisualizationSubsystem::GetSourceFrames(A
         Frame.DistanceMeters = Bearing.DistanceMeters;
         Frame.ElevationMeters = Bearing.ElevationMeters;
         Frame.SourceEnvelope = Envelope;
+        Frame.VisualAlpha = VisualAlpha;
+        Frame.EnvelopeHistory.Reserve(Source.Presentation.Count);
+        for (int32 Index = 0; Index < Source.Presentation.Count; ++Index)
+        {
+            Frame.EnvelopeHistory.Add(Source.Presentation.Sample(Index));
+        }
         float Gain = 1.0f;
         if (Source.bHasAttenuation)
         {
