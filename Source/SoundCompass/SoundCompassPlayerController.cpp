@@ -10,11 +10,17 @@
 #include "SoundCompass.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "SoundVisualization/SoundVisualizationWidget.h"
+#include "SoundVisualization/SoundHaloWidget.h"
 
 void ASoundCompassPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	if (IsLocalPlayerController() && bEnableSoundVisualization)
+	if (IsLocalPlayerController() && bEnableSoundVisualization && bUseSoundHalo)
+	{
+		SoundHaloWidget = CreateWidget<USoundHaloWidget>(this, USoundHaloWidget::StaticClass());
+		if (SoundHaloWidget) { SoundHaloWidget->AddToPlayerScreen(10); }
+	}
+	else if (IsLocalPlayerController() && bEnableSoundVisualization)
 	{
 		const TSubclassOf<USoundVisualizationWidget> WidgetClass = SoundVisualizationWidgetClass
 			? SoundVisualizationWidgetClass.Get() : USoundVisualizationWidget::StaticClass();
@@ -86,6 +92,11 @@ void ASoundCompassPlayerController::ToggleSoundVisualization()
 	if (SoundVisualizationWidget)
 	{
 		SoundVisualizationWidget->SetVisibility(SoundVisualizationWidget->IsVisible()
+			? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+	if (SoundHaloWidget)
+	{
+		SoundHaloWidget->SetVisibility(SoundHaloWidget->IsVisible()
 			? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	}
 }

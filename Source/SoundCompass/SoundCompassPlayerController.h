@@ -51,6 +51,13 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundVisualizationWidget> SoundVisualizationWidget;
 
+	/** Shows the 3D halo overlay instead of the original compass HUD. */
+	UPROPERTY(EditAnywhere, Category="Sound Compass")
+	bool bUseSoundHalo = true;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> SoundHaloWidget;
+
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 
