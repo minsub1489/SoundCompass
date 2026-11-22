@@ -71,3 +71,19 @@
 | 에셋 | 원본 | 라이선스 | 링크 |
 |---|---|---|---|
 | SW_Loop_Conversation, SW_Conversation_TwoPeople (앞 73초 발췌, Google NotebookLM으로 생성된 음성) | Street Epistemology Audio Dialogue.wav | Public domain | https://commons.wikimedia.org/wiki/File:Street_Epistemology_Audio_Dialogue.wav |
+
+## 맵 텍스처·소품 (`Content/SoundTest/Art`)
+
+모두 [Poly Haven](https://polyhaven.com)의 **CC0** 에셋입니다. 텍스처는 2K JPG(Diffuse, DirectX Normal, ARM), 모델은 1K glTF를 받았습니다.
+다운로드·임포트·머티리얼·배치 스크립트는 `Saved/SoundTestSetup/art/`에 있습니다.
+
+| 용도 | 에셋 | 링크 |
+|---|---|---|
+| Room 1~5, Room 7 1층 바닥, 경사로 | concrete_floor_02 | https://polyhaven.com/a/concrete_floor_02 |
+| Room 6 광장 바닥 | asphalt_02 | https://polyhaven.com/a/asphalt_02 |
+| Room 1~5 벽 | plastered_wall_04 | https://polyhaven.com/a/plastered_wall_04 |
+| Room 7 건물, 부스·안전실 벽 | red_brick_03 | https://polyhaven.com/a/red_brick_03 |
+| Room 7 2층 바닥 | laminate_floor_02 | https://polyhaven.com/a/laminate_floor_02 |
+| Room 7 옥상 | gravel_concrete_03 | https://polyhaven.com/a/gravel_concrete_03 |
+| 맵 바깥 지면 | aerial_grass_rock | https://polyhaven.com/a/aerial_grass_rock |
+| 소품 | concrete_road_barrier, metal_trash_can, modular_street_seating, fire_hydrant, potted_plant_02, covered_car, cardboard_box_01, Barrel_01, WoodenTable_01, Sofa_01, medical_box, exterior_aircon_unit, mounted_fluorescent_lights, modular_chainlink_fence | https://polyhaven.com/models |

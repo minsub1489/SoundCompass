@@ -11,6 +11,8 @@ inline FName SoundCompassCategory(FName Category)
     if (Name.Contains(TEXT("explos")) || Name.Contains(TEXT("grenade"))) { return TEXT("Explosion"); }
     if (Name.Contains(TEXT("foot")) || Name.Contains(TEXT("step"))) { return TEXT("Footstep"); }
     if (Name.Contains(TEXT("door"))) { return TEXT("Door"); }
+    if (Name.Contains(TEXT("glass")) || Name.Contains(TEXT("window")) || Name.Contains(TEXT("shatter"))) { return TEXT("GlassBreak"); }
+    if (Name.Contains(TEXT("throw")) || Name.Contains(TEXT("bounce"))) { return TEXT("Throw"); }
     if (Name.Contains(TEXT("conversation")) || Name.Contains(TEXT("voice"))) { return TEXT("Conversation"); }
     if (Name.Contains(TEXT("siren")) || Name.Contains(TEXT("alarm")) || Name.Contains(TEXT("alert"))) { return TEXT("Alert"); }
     if (Name.Contains(TEXT("ambien")) || Name.Contains(TEXT("music"))) { return TEXT("Ambience"); }

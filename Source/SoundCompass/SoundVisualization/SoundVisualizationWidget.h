@@ -26,6 +26,11 @@ public:
     float RingRadius = 220.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="0.0"))
     float WaveformGain = 12.0f;
+    /** Fixed total angular width centred on each source's bearing. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="10.0", ClampMax="120.0", Units="deg"))
+    float WaveformArcDegrees = 50.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Sound Compass", meta=(ClampMin="32.0", ClampMax="96.0"))
+    float IconSize = 52.0f;
 
     UFUNCTION(BlueprintCallable, Category="Sound Compass")
     void ToggleDiagnostics();
@@ -46,6 +51,7 @@ private:
     UTexture2D* GetIcon(FName Category) const;
     static FLinearColor GetCategoryColor(FName Category);
     static FString GetCategoryLabel(FName Category);
+    void UpdateMarkers(const FGeometry& MyGeometry);
 
     UPROPERTY(Transient) TObjectPtr<UCanvasPanel> RootCanvas;
     UPROPERTY(Transient) TObjectPtr<UImage> CenterRing;
