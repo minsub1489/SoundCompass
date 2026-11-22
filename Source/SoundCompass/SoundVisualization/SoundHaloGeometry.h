@@ -3,9 +3,10 @@
 #include "CoreMinimal.h"
 
 /**
- * Virtual 3D scene for the halo overlay, independent of the game camera.
- * Listener space: X = front, Y = right, Z = up, listener at the origin, ring radius = 1.
- * A virtual camera sits behind and above the listener and looks at the origin.
+ * Screen geometry for the halo overlay, independent of the game camera.
+ * Ring: listener space X = front, Y = right, Z = up, listener at the origin, ring radius = 1, seen by a
+ * virtual camera behind and above the listener. Markers: on an ellipse near the screen edge, using the
+ * same bearing convention as the ring (front = up, right = right, behind = down).
  */
 namespace SoundHaloGeometry
 {
@@ -22,11 +23,17 @@ struct FProjected
     float Scale = 1.0f;                       // perspective scale, 1 at the origin's depth
 };
 
+inline FVector CameraPosition(const FView& View)
+{
+    const float Pitch = FMath::DegreesToRadians(View.PitchDegrees);
+    return FVector(-View.CameraDistance * FMath::Cos(Pitch), 0.0f, View.CameraDistance * FMath::Sin(Pitch));
+}
+
 inline FProjected Project(const FVector& P, const FView& View)
 {
     const float Pitch = FMath::DegreesToRadians(View.PitchDegrees);
     const float D = View.CameraDistance;
-    const FVector Camera(-D * FMath::Cos(Pitch), 0.0f, D * FMath::Sin(Pitch));
+    const FVector Camera = CameraPosition(View);
     const FVector Forward(FMath::Cos(Pitch), 0.0f, -FMath::Sin(Pitch));
     const FVector Up(FMath::Sin(Pitch), 0.0f, FMath::Cos(Pitch));
     const FVector V = P - Camera;
@@ -41,44 +48,58 @@ inline float FarAmount(float Depth, const FView& View)
     return FMath::Clamp((Depth - (View.CameraDistance - 1.0f)) * 0.5f, 0.0f, 1.0f);
 }
 
-/** 0 m maps here: just outside the ring, so near sounds don't sit on the character's body. */
-constexpr float NearRadius = 1.2f;
-
-/** Log-scaled distance in ring radii: 0 m = 1.2, 5 m ~ 1.82, 15 m ~ 2.21, 30 m ~ 2.48. */
+/** Log-scaled ground distance in ring radii: 0 m = the ring, 5 m ~ 1.66, 15 m ~ 2.08, 30 m ~ 2.37. */
 inline float DistanceToRadius(float Meters, float MaxRadius)
 {
-    return FMath::Min(MaxRadius, NearRadius + 0.42f * FMath::Loge(1.0f + FMath::Max(0.0f, Meters) / 1.5f));
+    return FMath::Min(MaxRadius, 1.0f + 0.45f * FMath::Loge(1.0f + FMath::Max(0.0f, Meters) / 1.5f));
 }
 
 /** Inverse of DistanceToRadius (without the clamp): the distance drawn at a given radius. */
 inline float RadiusToDistance(float Radius)
 {
-    return 1.5f * (FMath::Exp((Radius - NearRadius) / 0.42f) - 1.0f);
+    return 1.5f * (FMath::Exp((Radius - 1.0f) / 0.45f) - 1.0f);
+}
+
+/** Point on the ring for a bearing (0 = front, +90 = right). */
+inline FVector RingPoint(float AzimuthDegrees)
+{
+    const float Azimuth = FMath::DegreesToRadians(AzimuthDegrees);
+    return FVector(FMath::Cos(Azimuth), FMath::Sin(Azimuth), 0.0f);
 }
 
 /**
- * Scene position of a source from the subsystem's bearing (0 = front, +90 = right).
- * Ground radius comes from the horizontal distance so the range rings read true;
- * height uses the same log scale on the vertical offset.
+ * Unit 3D direction a ring pointer aims along: the bearing, tilted by the elevation angle. The angle is
+ * exaggerated (one floor up should visibly tilt) and capped so a pointer never stands fully upright.
  */
-inline FVector SourcePoint(float AzimuthDegrees, float DistanceMeters, float ElevationMeters, float MaxRadius,
-    float HeightScale = 1.0f)
+inline FVector PointerDirection(float AzimuthDegrees, float HorizontalMeters, float ElevationMeters, float Exaggeration = 1.3f)
 {
-    const float Horizontal = FMath::Sqrt(FMath::Max(0.0f, DistanceMeters * DistanceMeters - ElevationMeters * ElevationMeters));
-    const float Ground = DistanceToRadius(Horizontal, MaxRadius);
-    const float Height = HeightScale * FMath::Sign(ElevationMeters)
-        * (DistanceToRadius(FMath::Abs(ElevationMeters), MaxRadius) - NearRadius);
+    const float Cap = FMath::DegreesToRadians(75.0f);
+    const float Elevation = FMath::Clamp(FMath::Atan2(ElevationMeters, FMath::Max(HorizontalMeters, 0.01f)) * Exaggeration, -Cap, Cap);
     const float Azimuth = FMath::DegreesToRadians(AzimuthDegrees);
-    return FVector(FMath::Cos(Azimuth) * Ground, FMath::Sin(Azimuth) * Ground, Height);
+    return FVector(FMath::Cos(Elevation) * FMath::Cos(Azimuth), FMath::Cos(Elevation) * FMath::Sin(Azimuth), FMath::Sin(Elevation));
 }
 
-/** One sound's marker on screen: icon circle plus a label box. Positions in pixels. */
+/** Point on the outer marker ellipse for a bearing, relative to the screen centre (Y down). */
+inline FVector2D EdgePoint(float AzimuthDegrees, const FVector2D& HalfExtent)
+{
+    const float Azimuth = FMath::DegreesToRadians(AzimuthDegrees);
+    return FVector2D(FMath::Sin(Azimuth) * HalfExtent.X, -FMath::Cos(Azimuth) * HalfExtent.Y);
+}
+
+/** 1 at the listener, 0 at FarMeters and beyond, log-shaped so near distances differ most. */
+inline float Nearness(float Meters, float FarMeters)
+{
+    const float Far = FMath::Loge(1.0f + FMath::Max(1.0f, FarMeters) / 1.5f);
+    return 1.0f - FMath::Clamp(FMath::Loge(1.0f + FMath::Max(0.0f, Meters) / 1.5f) / Far, 0.0f, 1.0f);
+}
+
+/** One sound's marker on screen: icon circle plus an optional label box below it. Pixels. */
 struct FMarkerLayout
 {
-    FVector2D Anchor = FVector2D::ZeroVector;      // projected sound position
+    FVector2D Anchor = FVector2D::ZeroVector;       // where the bearing puts it
     float IconRadius = 0.0f;
     FVector2D LabelSize = FVector2D::ZeroVector;
-    FVector2D IconPos = FVector2D::ZeroVector;     // out: Anchor, nudged off other markers
+    FVector2D IconPos = FVector2D::ZeroVector;      // out: Anchor, nudged off other markers
     FVector2D LabelTopLeft = FVector2D::ZeroVector; // out
 };
 
@@ -132,15 +153,5 @@ inline void LayoutMarkers(TArray<FMarkerLayout>& Items, float Gap = 4.0f)
     {
         Item.LabelTopLeft = Item.IconPos + FVector2D(-0.5f * Item.LabelSize.X, Item.IconRadius + Gap);
     }
-}
-
-/** Point on a donut of the cone around Axis: centre at Along * Axis, radius Along * tan(HalfAngle), capped. */
-inline FVector ConePoint(const FVector& Axis, float Along, float HalfAngleRadians, float Theta, float MaxRadius = 1e6f)
-{
-    const FVector A = (FMath::Abs(Axis.Z) > 0.95f ? FVector::CrossProduct(Axis, FVector::ForwardVector)
-        : FVector::CrossProduct(Axis, FVector::UpVector)).GetSafeNormal();
-    const FVector B = FVector::CrossProduct(Axis, A);
-    const float Radius = FMath::Min(MaxRadius, Along * FMath::Tan(HalfAngleRadians));
-    return Axis * Along + (A * FMath::Cos(Theta) + B * FMath::Sin(Theta)) * Radius;
 }
 }

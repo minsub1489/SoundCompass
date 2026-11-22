@@ -11,10 +11,9 @@ bool FSoundHaloGeometryTest::RunTest(const FString& Parameters)
     using namespace SoundHaloGeometry;
     const FView View;
     const FProjected Origin = Project(FVector::ZeroVector, View);
-    const FProjected Front = Project(FVector(1, 0, 0), View);
-    const FProjected Back = Project(FVector(-1, 0, 0), View);
-    const FProjected Right = Project(FVector(0, 1, 0), View);
-    const FProjected Up = Project(FVector(0, 0, 1), View);
+    const FProjected Front = Project(RingPoint(0), View);
+    const FProjected Back = Project(RingPoint(180), View);
+    const FProjected Right = Project(RingPoint(90), View);
 
     TestTrue(TEXT("Origin projects to the ring centre"), Origin.Screen.IsNearlyZero(1e-4));
     TestTrue(TEXT("Front of the ring is drawn above the centre"), Front.Screen.Y < 0.0);
@@ -22,34 +21,39 @@ bool FSoundHaloGeometryTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Front band is thinner than the back band"), Front.Scale < Back.Scale);
     TestTrue(TEXT("Front is farther than back"), FarAmount(Front.Depth, View) > FarAmount(Back.Depth, View));
     TestTrue(TEXT("Right is drawn on the right"), Right.Screen.X > 0.0);
-    TestTrue(TEXT("Up is drawn above the centre"), Up.Screen.Y < 0.0);
-    // Overhead and flat-front both go up on screen; depth tells them apart.
-    TestTrue(TEXT("Overhead is nearer than flat front"), Up.Depth < Front.Depth);
 
-    TestTrue(TEXT("0 m sits just outside the ring"), FMath::IsNearlyEqual(DistanceToRadius(0, 2.4f), NearRadius) && NearRadius > 1.0f);
-    TestTrue(TEXT("Distance grows monotonically"), DistanceToRadius(5, 2.4f) < DistanceToRadius(15, 2.4f));
-    TestTrue(TEXT("Far sounds are clamped"), FMath::IsNearlyEqual(DistanceToRadius(1000, 2.4f), 2.4f));
+    // The outer ellipse uses the ring's convention, so ring and markers agree on every bearing.
+    const FVector2D Half(800.0, 400.0);
+    TestTrue(TEXT("Edge: front is the top"), EdgePoint(0, Half).Equals(FVector2D(0.0, -400.0), 1e-3));
+    TestTrue(TEXT("Edge: right is the right"), EdgePoint(90, Half).Equals(FVector2D(800.0, 0.0), 1e-3));
+    TestTrue(TEXT("Edge: behind is the bottom"), EdgePoint(180, Half).Equals(FVector2D(0.0, 400.0), 1e-3));
+    for (const float Bearing : {30.0f, 120.0f, -60.0f, -150.0f})
+    {
+        const FVector2D Edge = EdgePoint(Bearing, Half);
+        const FVector2D Ring = Project(RingPoint(Bearing), View).Screen;
+        TestTrue(FString::Printf(TEXT("Edge and ring agree on side at %.0f deg"), Bearing),
+            FMath::Sign(Edge.X) == FMath::Sign(Ring.X) && FMath::Sign(Edge.Y) == FMath::Sign(Ring.Y));
+    }
+
+    TestTrue(TEXT("0 m sits on the ring"), FMath::IsNearlyEqual(DistanceToRadius(0, 2.6f), 1.0f));
+    TestTrue(TEXT("Distance grows monotonically"), DistanceToRadius(5, 2.6f) < DistanceToRadius(15, 2.6f));
+    TestTrue(TEXT("Far sounds are clamped"), FMath::IsNearlyEqual(DistanceToRadius(1000, 2.6f), 2.6f));
     TestTrue(TEXT("RadiusToDistance inverts DistanceToRadius"), FMath::IsNearlyEqual(RadiusToDistance(DistanceToRadius(12, 9)), 12.0f, 1e-3f));
-    const FVector Right10 = SourcePoint(90, 10, 0, 2.4f);
-    TestTrue(TEXT("Azimuth +90 is on the right, on the ground"), Right10.Y > 1.0f && FMath::IsNearlyZero(Right10.X, 1e-4f) && FMath::IsNearlyZero(Right10.Z));
-    TestTrue(TEXT("Ground radius uses horizontal distance"),
-        FMath::IsNearlyEqual(SourcePoint(0, 5, 3, 2.4f).X, DistanceToRadius(4, 2.4f), 1e-4f));
-    const FVector Overhead = SourcePoint(0, 4, 4, 2.4f);
-    TestTrue(TEXT("Overhead sits above the ring"), Overhead.Z > 0.3f && FMath::IsNearlyEqual(Overhead.X, NearRadius, 1e-4f));
-    TestTrue(TEXT("Below is negative height"), SourcePoint(0, 6, -4, 2.4f).Z < 0.0f);
-    TestTrue(TEXT("Zero distance is safe"), !SourcePoint(0, 0, 5, 2.4f).ContainsNaN());
 
-    const FVector Axis(0, 1, 0);
-    const float Half = FMath::DegreesToRadians(20.0f);
-    const FVector P = ConePoint(Axis, 2.0f, Half, 1.3f);
-    TestTrue(TEXT("Donut centre lies on the axis"), FMath::IsNearlyEqual(FVector::DotProduct(P, Axis), 2.0f, 1e-4f));
-    TestTrue(TEXT("Donut radius grows with distance"),
-        FMath::IsNearlyEqual((P - Axis * 2.0f).Size(), 2.0f * FMath::Tan(Half), 1e-4f));
-    TestTrue(TEXT("Vertical axis is safe"), !ConePoint(FVector::UpVector, 1.0f, Half, 0.0f).ContainsNaN());
-    TestTrue(TEXT("Donut radius is capped"),
-        FMath::IsNearlyEqual((ConePoint(Axis, 2.0f, Half, 1.3f, 0.3f) - Axis * 2.0f).Size(), 0.3f, 1e-4f));
+    TestTrue(TEXT("Pointer: level front sound points straight ahead"), PointerDirection(0, 10, 0).Equals(FVector(1, 0, 0), 1e-4));
+    const FVector Upstairs = PointerDirection(90, 1.5f, 5);
+    TestTrue(TEXT("Pointer: sound above-right tilts up and right"), Upstairs.Z > 0.5f && Upstairs.Y > 0.0f);
+    const FVector Basement = PointerDirection(180, 5, -5);
+    TestTrue(TEXT("Pointer: sound below-behind tilts down and back"), Basement.Z < 0.0f && Basement.X < 0.0f);
+    TestTrue(TEXT("Pointer: straight up is capped below vertical"),
+        PointerDirection(0, 0, 100).Z <= FMath::Sin(FMath::DegreesToRadians(75.0f)) + 1e-4f);
+    TestTrue(TEXT("Pointer: unit length"), FMath::IsNearlyEqual(PointerDirection(37, 3, 2).Size(), 1.0f, 1e-4f));
 
-    // Three markers on the same spot (e.g. front footsteps and overhead stomping projecting together).
+    TestTrue(TEXT("Nearness is 1 at the listener"), FMath::IsNearlyEqual(Nearness(0, 40), 1.0f));
+    TestTrue(TEXT("Nearness is 0 at the far limit and beyond"), FMath::IsNearlyZero(Nearness(40, 40)) && FMath::IsNearlyZero(Nearness(500, 40)));
+    TestTrue(TEXT("Nearness falls with distance"), Nearness(3, 40) > Nearness(10, 40) && Nearness(10, 40) > Nearness(30, 40));
+
+    // Three markers on the same spot.
     TArray<FMarkerLayout> Markers;
     for (int32 Index = 0; Index < 3; ++Index)
     {

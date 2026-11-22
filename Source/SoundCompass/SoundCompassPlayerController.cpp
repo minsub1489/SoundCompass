@@ -112,4 +112,5 @@ void ASoundCompassPlayerController::ToggleSoundDisplayMode()
 void ASoundCompassPlayerController::ToggleSoundDiagnostics()
 {
 	if (SoundVisualizationWidget) { SoundVisualizationWidget->ToggleDiagnostics(); }
+	if (USoundHaloWidget* Halo = Cast<USoundHaloWidget>(SoundHaloWidget)) { Halo->ToggleLabels(); }
 }
