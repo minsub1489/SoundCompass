@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Round, isSurpriseHit } from '../src/round.js';
-import { toCsv, csvField, csvFilename, CSV_HEADER } from '../src/results.js';
+import { toCsv, csvField, csvFilename, CSV_HEADER, localIsoString } from '../src/results.js';
 
 const mk = (o = {}) => new Round({ participantId: 'P01', condition: 'A', mapId: 'urban', audioOutput: 'binaural', isPractice: false, startedAt: new Date('2026-12-01T10:20:30Z'), ...o });
 
@@ -41,7 +41,14 @@ describe('CSV', () => {
   });
   it('BOM, 헤더, 데이터 한 줄을 쓴다', () => {
     const r = mk({ condition: '소리 끔, 시스템' }); r.addCrate(); r.addKill(); r.addDeath(); r.addDamage(25, true);
-    expect(toCsv(r)).toBe('﻿' + CSV_HEADER + '\r\n' + 'P01,"소리 끔, 시스템",urban,binaural,2026-12-01T10:20:30.000Z,1,1,1,25,1\r\n');
+    expect(toCsv(r)).toBe('﻿' + CSV_HEADER + '\r\n' + 'P01,"소리 끔, 시스템",urban,binaural,' + localIsoString(r.startedAt) + ',1,1,1,25,1\r\n');
+  });
+  it('시작 시각은 오프셋이 붙은 현지 시각이다', () => {
+    const d = new Date('2026-12-01T10:20:30Z');
+    const s = localIsoString(d);
+    expect(s).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+    expect(Date.parse(s)).toBe(d.getTime());
+    expect(Number(s.slice(11, 13))).toBe(d.getHours());
   });
   it('파일 이름의 금지 문자를 바꾼다', () => {
     expect(csvFilename(mk({ participantId: 'P 01/a' }))).toMatch(/^P_01_a_urban_\d{8}-\d{6}\.csv$/);

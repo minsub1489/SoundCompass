@@ -19,8 +19,13 @@ export function initialCrateIndices(candidates, count, rng) {
   return pool.slice(0, count);
 }
 
-export function chooseRespawnIndex(points, playerPos, isVisible, minDistM) {
-  const all = points.map((_, i) => i);
+const AVOID_M = 3;
+
+// avoid: positions of other live bots; points near them are skipped unless every point is taken.
+export function chooseRespawnIndex(points, playerPos, isVisible, minDistM, avoid = []) {
+  const indices = points.map((_, i) => i);
+  const free = indices.filter(i => avoid.every(a => dist(points[i], a) >= AVOID_M));
+  const all = free.length ? free : indices;
   const hidden = all.filter(i => !isVisible(points[i]));
   const good = hidden.filter(i => dist(points[i], playerPos) >= minDistM);
   if (good.length) return farthest(good, points, playerPos);

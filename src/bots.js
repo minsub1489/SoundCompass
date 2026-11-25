@@ -105,7 +105,8 @@ export function createBots({ scene, physics, nav, map, player, round, camera, su
   }
 
   function respawn(bot) {
-    const i = chooseRespawnIndex(map.respawnPoints, player.position, visibleToPlayer, MIN_RESPAWN_DIST_M);
+    const others = bots.filter(b => b !== bot && b.alive).map(pos);
+    const i = chooseRespawnIndex(map.respawnPoints, player.position, visibleToPlayer, MIN_RESPAWN_DIST_M, others);
     bot.character.teleport(map.respawnPoints[i]);
     bot.character.setEnabled(true);
     Object.assign(bot, { alive: true, health: BOT_MAX_HEALTH, state: initialBotState(), vy: 0, path: [], pathTarget: null, gun: createGun(bot.def), pending: [] });

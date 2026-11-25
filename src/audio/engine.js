@@ -3,7 +3,8 @@ import { OCCLUSION } from '../config.js';
 import { occlusionTarget, applyOcclusion } from './occlusion.js';
 import { speakerGains71, SPEAKER_ORDER_71, canUse71, inverseDistanceGain, PANNER } from './speakers71.js';
 
-const NO_71 = '출력 장치가 7.1(8채널)이 아닙니다. Windows 소리 설정에서 출력 장치를 7.1로 바꾸세요.';
+// The context keeps the channel count it saw at creation, so a device change needs a page reload.
+const NO_71 = '출력 장치가 7.1(8채널)이 아닙니다. Windows 소리 설정에서 출력 장치를 7.1로 바꾼 뒤 이 페이지를 새로 고치세요.';
 // Occlusion is tested toward a point above the emitter so foot-level sounds do not graze the floor they stand on.
 const OCC_LIFT_M = 0.5;
 const SMOOTH_S = 0.02;

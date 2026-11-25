@@ -35,4 +35,10 @@ describe('chooseRespawnIndex', () => {
   it('보이지 않는 곳이 모두 가까우면 그중 가장 먼 곳', () => {
     expect(chooseRespawnIndex(pts, [0, 0, 0], p => p[0] >= 20, 15)).toBe(1);
   });
+  it('다른 봇이 있는 지점은 피한다', () => {
+    expect(chooseRespawnIndex(pts, [0, 0, 0], () => false, 15, [[40, 0, 1]])).toBe(2);
+  });
+  it('모든 지점에 봇이 있으면 피하지 않고 고른다', () => {
+    expect(chooseRespawnIndex(pts, [0, 0, 0], () => false, 15, pts)).toBe(3);
+  });
 });

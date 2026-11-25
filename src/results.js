@@ -7,13 +7,19 @@ export function csvField(value) {
 
 export function toCsv(round) {
   const s = round.stats;
-  const row = [round.participantId, round.condition, round.mapId, round.audioOutput, round.startedAt.toISOString(),
+  const row = [round.participantId, round.condition, round.mapId, round.audioOutput, localIsoString(round.startedAt),
     s.crates, s.kills, s.deaths, s.damageTaken, s.surpriseHits].map(csvField).join(',');
   // BOM so Excel opens Korean text as UTF-8.
   return '﻿' + CSV_HEADER + '\r\n' + row + '\r\n';
 }
 
 const pad = n => String(n).padStart(2, '0');
+
+// Local wall-clock time with its UTC offset, e.g. 2026-12-01T19:20:30+09:00, so it lines up with survey times.
+export function localIsoString(d) {
+  const off = -d.getTimezoneOffset(), sign = off >= 0 ? '+' : '-', a = Math.abs(off);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
+}
 
 export function csvFilename(round) {
   const d = round.startedAt;
