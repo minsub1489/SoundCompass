@@ -12,6 +12,7 @@ class USoundAttenuation;
 class USoundSubmix;
 class APlayerController;
 class FSoundCompassBufferListener;
+namespace SoundOverlay { class FSender; }
 
 UENUM(BlueprintType)
 enum class ESoundCompassDisplayMode : uint8
@@ -207,6 +208,7 @@ private:
     uint64 LastBufferRevision = 0;
     FAudioDeviceHandle CaptureDevice;
     TSharedPtr<FSoundCompassBufferListener, ESPMode::ThreadSafe> BufferListener;
+    TSharedPtr<SoundOverlay::FSender> OverlaySender;
 
     UPROPERTY(Transient) TObjectPtr<USoundSubmix> CaptureSubmix;
     UPROPERTY(Transient) FSoundCompassSignalFrame SignalFrame;

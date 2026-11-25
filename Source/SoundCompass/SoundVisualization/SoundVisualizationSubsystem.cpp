@@ -2,6 +2,7 @@
 #include "SoundVisualization/SoundSignalAnalysis.h"
 #include "SoundVisualization/SoundImportancePolicy.h"
 #include "SoundVisualization/SoundCategory.h"
+#include "SoundVisualization/SoundOverlaySender.h"
 #include "SoundCompass.h"
 #include "AudioDevice.h"
 #include "ActiveSound.h"
@@ -360,6 +361,14 @@ void USoundVisualizationSubsystem::Tick(float DeltaTime)
     StartCapture();
     UpdateSignal(Elapsed);
     OnVisualizationUpdated.Broadcast();
+    if (SoundOverlay::IsEnabled())
+    {
+        // Ground truth for the external overlay: every audible source, not only the important ones.
+        if (!OverlaySender) { OverlaySender = MakeShared<SoundOverlay::FSender>(); }
+        OverlaySender->Send(SoundOverlay::BuildMessage(GetSourceFrames(GetWorld()->GetFirstPlayerController()), Now),
+            SoundOverlay::Ports());
+    }
+    else { OverlaySender.Reset(); }
 }
 
 void USoundVisualizationSubsystem::UpdateSignal(float DeltaTime)
@@ -511,6 +520,7 @@ void USoundVisualizationSubsystem::Deinitialize()
         CaptureDevice->UnregisterSubmixBufferListener(BufferListener.ToSharedRef(), *CaptureSubmix);
     }
     BufferListener.Reset();
+    OverlaySender.Reset();
     CaptureSubmix = nullptr;
     CaptureDevice.Reset();
     SignalFrame = FSoundCompassSignalFrame();

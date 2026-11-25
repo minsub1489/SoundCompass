@@ -21,7 +21,7 @@ public class SoundCompass : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "AudioMixer" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "AudioMixer", "Sockets", "Networking", "Json" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"SoundCompass",
