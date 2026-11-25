@@ -1,3 +1,8 @@
+// Chrome on Windows occasionally reports one pointer-lock mousemove with a jump of hundreds of px; real flicks at
+// normal polling rates arrive as many small events, so a single event this large is treated as noise.
+const SPIKE_PX = 300;
+export const isMouseSpike = (dx, dy) => Math.abs(dx) > SPIKE_PX || Math.abs(dy) > SPIKE_PX;
+
 export function createInput(canvas) {
   const keys = new Set();
   const lockCallbacks = [];
@@ -7,7 +12,9 @@ export function createInput(canvas) {
   addEventListener('keydown', e => { if (locked) { keys.add(e.code); if (e.code === 'Space') e.preventDefault(); } });
   addEventListener('keyup', e => keys.delete(e.code));
   addEventListener('blur', release);
-  document.addEventListener('mousemove', e => { if (locked) { dx += e.movementX; dy += e.movementY; } });
+  document.addEventListener('mousemove', e => {
+    if (locked && !isMouseSpike(e.movementX, e.movementY)) { dx += e.movementX; dy += e.movementY; }
+  });
   canvas.addEventListener('mousedown', e => { if (locked && e.button === 0) firing = true; });
   addEventListener('mouseup', e => { if (e.button === 0) firing = false; });
   document.addEventListener('pointerlockchange', () => {
@@ -22,6 +29,9 @@ export function createInput(canvas) {
     get firing() { return firing; },
     get locked() { return locked; },
     onLockChange(cb) { lockCallbacks.push(cb); },
-    requestLock() { return canvas.requestPointerLock(); },
+    // Raw mouse input (no OS acceleration) when the browser supports it; plain lock otherwise.
+    async requestLock() {
+      try { await canvas.requestPointerLock({ unadjustedMovement: true }); } catch { await canvas.requestPointerLock(); }
+    },
   };
 }
