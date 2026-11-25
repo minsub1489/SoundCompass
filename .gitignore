@@ -46,3 +46,8 @@ Plugins/*/Intermediate/
 *.tmp
 .DS_Store
 Thumbs.db
+
+# External halo overlay
+HaloOverlay/overlay/build/
+HaloOverlay/**/__pycache__/
+HaloOverlay/**/.venv/
