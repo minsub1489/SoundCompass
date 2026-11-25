@@ -141,6 +141,19 @@ static void many_events_cap_markers()
     CHECK(lowestMarker >= highestOther);
 }
 
+static void mirrored_marks_share_the_icon_cap()
+{
+    static const char* classes[] = {"Alarm", "Dog", "Door", "Explosion", "Fire", "Footstep", "GlassBreak",
+        "Gunshot", "Impact", "Item", "Reload", "Throwable", "Vehicle", "Voice"};
+    std::vector<Event> events;
+    for (int i = 0; i < 14; ++i) { events.push_back(Ev(i + 1, classes[i], -90.0f + 12.0f * i, 0.0f)); }
+    Scene scene;
+    scene.Apply(Msg(events), 0.0);
+    const auto marks = scene.Snapshot(0.0);
+    CHECK(marks.size() == 28);
+    CHECK(std::count_if(marks.begin(), marks.end(), [](const Mark& m) { return m.marker; }) == 4);
+}
+
 static void src_filter()
 {
     Scene scene;
@@ -176,6 +189,7 @@ int main()
     RUN(mirror_when_front_back_unknown);
     RUN(bin_sets_distance);
     RUN(many_events_cap_markers);
+    RUN(mirrored_marks_share_the_icon_cap);
     RUN(src_filter);
     RUN(level_feeds_trail);
     return g_failures;

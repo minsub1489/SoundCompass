@@ -76,6 +76,7 @@ std::vector<Mark> Scene::Snapshot(double now) const
     std::stable_sort(ranked.begin(), ranked.end(), [](const Ranked& a, const Ranked& b) { return a.importance > b.importance; });
 
     std::vector<Mark> marks;
+    int iconSlots = 0; // the icon cap counts icons on screen, so a mirrored track uses two
     for (size_t index = 0; index < ranked.size(); ++index)
     {
         const Track& track = *ranked[index].track;
@@ -89,9 +90,11 @@ std::vector<Mark> Scene::Snapshot(double now) const
         mark.alpha = ranked[index].alpha;
         mark.onsetAge = static_cast<float>(now - track.onset);
         mark.importance = ranked[index].importance;
-        mark.marker = static_cast<int>(index) < config_.maxMarkers;
+        const bool mirrored = track.last.fb < config_.mirrorBelowFb;
+        mark.marker = iconSlots + (mirrored ? 2 : 1) <= config_.maxMarkers;
+        if (mark.marker) { iconSlots += mirrored ? 2 : 1; }
         mark.trail = track.trail;
-        if (track.last.fb < config_.mirrorBelowFb)
+        if (mirrored)
         {
             // Front/back unknown: show both candidates, each at half strength.
             mark.mirrored = true;
