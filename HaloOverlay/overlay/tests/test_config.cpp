@@ -54,6 +54,14 @@ static void hotkey_parse()
     CHECK(!ParseHotkey("Ctrl+", mods, vk));
 }
 
+static void hotkey_registration_reports_conflicts()
+{
+    CHECK(RegisterHotkeyText(nullptr, 101, "Ctrl+Alt+Shift+F23"));
+    CHECK(!RegisterHotkeyText(nullptr, 102, "Ctrl+Alt+Shift+F23")); // taken: the caller must be told
+    CHECK(!RegisterHotkeyText(nullptr, 103, "Banana"));
+    UnregisterHotKey(nullptr, 101);
+}
+
 int main()
 {
     RUN(missing_file_defaults);
@@ -61,5 +69,6 @@ int main()
     RUN(partial_file_merges);
     RUN(wrong_type_keeps_default);
     RUN(hotkey_parse);
+    RUN(hotkey_registration_reports_conflicts);
     return g_failures;
 }

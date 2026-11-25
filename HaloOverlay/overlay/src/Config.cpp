@@ -77,4 +77,10 @@ bool ParseHotkey(std::string_view text, UINT& modifiers, UINT& vk)
     vk = key;
     return true;
 }
+
+bool RegisterHotkeyText(HWND hwnd, int id, std::string_view text)
+{
+    UINT mods = 0, vk = 0;
+    return ParseHotkey(text, mods, vk) && RegisterHotKey(hwnd, id, mods | MOD_NOREPEAT, vk);
+}
 }

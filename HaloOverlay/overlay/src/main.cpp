@@ -1,6 +1,8 @@
+#include <fstream>
 #include <string>
 
 #include <wincodec.h>
+#include <timeapi.h>
 
 #include "Config.h"
 #include "OverlayWindow.h"
@@ -33,14 +35,27 @@ std::filesystem::path ExeDir()
     return std::filesystem::path(path).parent_path();
 }
 
-void Register(HWND hwnd, int id, const std::string& text)
+/** --stats: every 10 s, frames per second and CPU time of Painter::Paint appended to halo_stats.log. */
+struct Stats
 {
-    UINT mods = 0, vk = 0;
-    if (!halo::ParseHotkey(text, mods, vk) || !RegisterHotKey(hwnd, id, mods | MOD_NOREPEAT, vk))
+    bool on = false;
+    double start = 0.0, paintSum = 0.0, paintMax = 0.0;
+    int frames = 0;
+
+    void Frame(double now, double paintSeconds)
     {
-        OutputDebugStringA(("HaloOverlay: hotkey " + text + " unavailable, continuing without it\n").c_str());
+        if (!on) { return; }
+        if (frames == 0) { start = now - 1e-9; }
+        ++frames;
+        paintSum += paintSeconds;
+        paintMax = std::max(paintMax, paintSeconds);
+        if (now - start < 10.0) { return; }
+        std::ofstream(ExeDir() / "halo_stats.log", std::ios::app) << "fps=" << frames / (now - start)
+            << " paint_ms_mean=" << 1000.0 * paintSum / frames << " paint_ms_max=" << 1000.0 * paintMax << "\n";
+        frames = 0;
+        paintSum = paintMax = 0.0;
     }
-}
+};
 
 /** Exit code 0 when the window has every overlay style and did not take the foreground. */
 int SelfTestWindow(const halo::Config& config)
@@ -75,8 +90,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
         MessageBoxW(nullptr, L"Cannot create the overlay window (Direct3D 11 / DirectComposition).", L"SoundCompass Halo", MB_ICONERROR);
         return 1;
     }
-    Register(window.Hwnd(), kLabels, config.labelsHotkey);
-    Register(window.Hwnd(), kQuit, config.quitHotkey);
+    if (!halo::RegisterHotkeyText(window.Hwnd(), kQuit, config.quitHotkey))
+    {
+        // No taskbar entry and no focus: without its quit key the overlay could only be ended from Task Manager.
+        const std::wstring key(config.quitHotkey.begin(), config.quitHotkey.end());
+        MessageBoxW(nullptr, (L"The quit hotkey " + key + L" is invalid or used by another program.\n"
+            L"Set another quit_hotkey in halo_overlay.json next to HaloOverlay.exe.").c_str(), L"SoundCompass Halo", MB_ICONERROR);
+        return 1;
+    }
+    if (!halo::RegisterHotkeyText(window.Hwnd(), kLabels, config.labelsHotkey))
+    {
+        OutputDebugStringA(("HaloOverlay: labels hotkey " + config.labelsHotkey + " unavailable, continuing without it\n").c_str());
+    }
+    Stats stats;
+    stats.on = std::wstring(commandLine).find(L"--stats") != std::wstring::npos;
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
@@ -93,6 +120,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
     halo::Scene scene(sceneConfig);
     bool labels = false;
     bool drawnIdle = false;
+    constexpr double kFramePeriod = 1.0 / 60.0;
+    double lastFrame = -1.0;
+    timeBeginPeriod(1); // 1 ms wait resolution for the frame pacing; ended by process exit
     for (;;)
     {
         MSG msg;
@@ -110,13 +140,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
         }
 
         const bool idle = scene.Idle(now);
+        const double sinceFrame = now - lastFrame;
+        if ((!idle || !drawnIdle) && sinceFrame < kFramePeriod)
+        {
+            // About 60 Hz whatever the monitor runs at (a 180 Hz monitor would triple the work next to a game).
+            const HANDLE socketEvent = receiver.Event();
+            const auto waitMs = static_cast<DWORD>((kFramePeriod - sinceFrame) * 1000.0);
+            if (waitMs > 0) { MsgWaitForMultipleObjects(1, &socketEvent, FALSE, waitMs, QS_ALLINPUT); }
+            continue;
+        }
         if (!idle || !drawnIdle)
         {
+            lastFrame = now;
             params.labels = labels;
             params.now = now;
             window.Begin();
+            const double paintStart = Now();
             painter.Paint(scene.Snapshot(now), params);
+            const double paintSeconds = Now() - paintStart;
             window.End(); // blocks until vsync while sounds are visible
+            stats.Frame(now, paintSeconds);
             drawnIdle = idle;
         }
         if (idle)
