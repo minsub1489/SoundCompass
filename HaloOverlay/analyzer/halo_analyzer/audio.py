@@ -23,41 +23,83 @@ class FileSource:
             yield data[i:i + block], sr
 
 
+def default_render_id() -> str | None:
+    """Id of the current default output device straight from Windows Core Audio (IMMDeviceEnumerator).
+
+    PortAudio enumerates devices once per Pa_Initialize and its init is reference counted, so a second
+    PyAudio() opened while a stream is alive still sees the startup device list.
+    """
+    import ctypes
+
+    ole32 = ctypes.windll.ole32
+    ole32.CoInitializeEx(None, 0)  # S_FALSE or RPC_E_CHANGED_MODE are fine: COM is usable either way
+    clsid, iid = (ctypes.c_byte * 16)(), (ctypes.c_byte * 16)()
+    ole32.CLSIDFromString("{BCDE0395-E52F-467C-8E3D-C4579291692E}", ctypes.byref(clsid))  # MMDeviceEnumerator
+    ole32.CLSIDFromString("{A95664D2-9614-4F35-A746-DE8DB63617E6}", ctypes.byref(iid))    # IMMDeviceEnumerator
+    enumerator, device, text = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_wchar_p()
+
+    def method(obj, index, *args):
+        vtable = ctypes.cast(obj, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+        return ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, *args)(vtable[index])
+
+    try:
+        if ole32.CoCreateInstance(ctypes.byref(clsid), None, 23, ctypes.byref(iid), ctypes.byref(enumerator)) != 0:
+            return None
+        # IMMDeviceEnumerator::GetDefaultAudioEndpoint(eRender, eConsole, &device), then IMMDevice::GetId(&text)
+        if method(enumerator, 4, ctypes.c_int, ctypes.c_int, ctypes.c_void_p)(enumerator, 0, 0, ctypes.byref(device)) != 0:
+            return None
+        if method(device, 5, ctypes.c_void_p)(device, ctypes.byref(text)) != 0:
+            return None
+        return text.value
+    finally:
+        if text:
+            ole32.CoTaskMemFree(text)
+        for obj in (device, enumerator):
+            if obj:
+                method(obj, 2)(obj)  # Release
+
+
 class LoopbackSource:
-    """Default render device through WASAPI loopback (PyAudioWPatch), reopened when the default device changes."""
+    """Default render device through WASAPI loopback (PyAudioWPatch).
 
-    def __init__(self, block_s: float = 0.01, check_s: float = 1.0):
-        self.block_s, self.check_s = block_s, check_s
+    Reopened when the default device changes (checked every check_s through Core Audio) or a read fails
+    (WASAPI invalidates the stream when the device or its format changes). Each reopen tears PortAudio down
+    completely, so the new instance enumerates devices again.
+    """
 
-    @staticmethod
-    def _default_loopback(pyaudio_module):
-        pa = pyaudio_module.PyAudio()  # a fresh instance sees the current default device
-        try:
-            return pa.get_default_wasapi_loopback()
-        finally:
-            pa.terminate()
+    def __init__(self, block_s: float = 0.01, check_s: float = 1.0, retry_s: float = 0.5, backend=None,
+                 default_id=default_render_id):
+        self.block_s, self.check_s, self.retry_s = block_s, check_s, retry_s
+        self.backend, self.default_id = backend, default_id
 
     def __iter__(self) -> Iterator[tuple[np.ndarray, int]]:
-        import pyaudiowpatch as pyaudio
+        pyaudio = self.backend
+        if pyaudio is None:
+            import pyaudiowpatch as pyaudio
 
         while True:
-            device = self._default_loopback(pyaudio)
+            device_id = self.default_id()
             pa = pyaudio.PyAudio()
-            sr, channels = int(device["defaultSampleRate"]), int(device["maxInputChannels"])
-            block = max(1, int(round(self.block_s * sr)))
-            stream = pa.open(format=pyaudio.paFloat32, channels=channels, rate=sr, input=True,
-                             input_device_index=device["index"], frames_per_buffer=block)
+            stream = None
             try:
+                device = pa.get_default_wasapi_loopback()
+                sr, channels = int(device["defaultSampleRate"]), int(device["maxInputChannels"])
+                block = max(1, int(round(self.block_s * sr)))
+                stream = pa.open(format=pyaudio.paFloat32, channels=channels, rate=sr, input=True,
+                                 input_device_index=device["index"], frames_per_buffer=block)
                 checked = time.perf_counter()
                 while True:
                     raw = stream.read(block, exception_on_overflow=False)
                     yield np.frombuffer(raw, dtype=np.float32).reshape(-1, channels), sr
                     if time.perf_counter() - checked >= self.check_s:
                         checked = time.perf_counter()
-                        if self._default_loopback(pyaudio)["name"] != device["name"]:
+                        if self.default_id() != device_id:
                             break
+            except OSError:
+                time.sleep(self.retry_s)  # device gone or format changed: reopen whatever is default now
             finally:
-                stream.close()
+                if stream is not None:
+                    stream.close()
                 pa.terminate()
 
 
