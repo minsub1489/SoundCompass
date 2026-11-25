@@ -127,3 +127,14 @@ def test_rise_db_from_config():
     assert feed(analyzer, [steady] * 4 + [loud])[-1][1] == []
     default, _, _ = make()
     assert feed(default, [steady] * 4 + [loud])[-1][1] != []
+
+
+def test_no_onset_only_continues_tracked_classes():
+    classifier = load_adapter("fake_classifier", FAKE, "cpu")
+    analyzer = Analyzer(classifier, None, None, AnalyzerConfig())
+    window = burst(8, 40.0)
+    assert [e.cls for e in feed(analyzer, silence(8) + [window])[-1][1]] == ["Door"]
+    classifier.predict = lambda audio, sr: {"class": "Gunshot", "scores": {"Door": 0.8, "Gunshot": 0.9}}
+    steady = np.repeat(window[-4800:], 10, axis=0)  # same level as the last hop: no new onset
+    _, events = analyzer.process(steady, SR, 1.0)
+    assert [e.cls for e in events] == ["Door"]

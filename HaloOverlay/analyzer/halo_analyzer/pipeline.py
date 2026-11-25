@@ -58,12 +58,16 @@ class Analyzer:
     def process(self, window: np.ndarray, sr: int, t: float) -> tuple[str, list[Event]]:
         window = np.asarray(window, dtype=np.float32)
         mode = "surround" if layout_for(window.shape[1]) else "stereo"
-        if not self.onset.update(window, sr) and not self.active:
+        onset = self.onset.update(window, sr)
+        if not onset and not self.active:
             self.tracker.assign([])
             return mode, []
 
         scores = class_scores(self.classifier.predict(window.mean(axis=1, keepdims=True), sr))
-        chosen = sorted(((s, c) for c, s in scores.items() if c in CLASSES and self.classes.passes(c, s)), reverse=True)
+        # Without an onset only sounds already being tracked may continue; new classes need an onset.
+        tracked = None if onset else {d.cls for _, d in self.tracker.previous}
+        chosen = sorted(((s, c) for c, s in scores.items()
+                         if c in CLASSES and self.classes.passes(c, s) and (tracked is None or c in tracked)), reverse=True)
         chosen = chosen[:self.config.max_events]
         kept = [(score, cls, d) for (score, cls), d in zip(chosen, self._directions(window, sr, mode, chosen)) if d]
         detections = []
