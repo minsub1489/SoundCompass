@@ -2,7 +2,8 @@
 
 Usage: py -3.12 compare_streams.py session.jsonl [--window 1.0] [--max-az-err 30]
 Each ground-truth onset (first message with a new ue id) is paired with the first unused model onset that arrives
-0..window s later within max-az-err degrees. Latency counts only pairs whose class also matches.
+0..window s later within max-az-err degrees (for a folded stereo azimuth, fb < 0.5, its front/back mirror counts too).
+Latency counts only pairs whose class also matches.
 """
 import argparse
 import json
@@ -32,7 +33,7 @@ def _onsets(records, src):
         for e in m.get("events", []):
             if e["id"] not in seen:
                 seen.add(e["id"])
-                out.append({"recv": r["recv"], "cls": e["cls"], "az": float(e["az"])})
+                out.append({"recv": r["recv"], "cls": e["cls"], "az": float(e["az"]), "fb": float(e.get("fb", 1.0))})
     return out
 
 
@@ -41,7 +42,9 @@ def compare(records: list[dict], window_s: float = 1.0, max_az_err: float = 30.0
     used, pairs = set(), []
     for g in truth:
         for i, m in enumerate(model):
-            if i not in used and 0.0 <= m["recv"] - g["recv"] <= window_s and abs(_wrap(m["az"] - g["az"])) <= max_az_err:
+            # A folded (front/back unknown) azimuth also matches through its mirror; _front_back then counts it.
+            near = min(abs(_wrap(m["az"] - g["az"])), abs(_wrap(180.0 - m["az"] - g["az"])) if m["fb"] < 0.5 else 360.0)
+            if i not in used and 0.0 <= m["recv"] - g["recv"] <= window_s and near <= max_az_err:
                 used.add(i)
                 pairs.append((g, m))
                 break

@@ -10,8 +10,8 @@ def msg(src, events):
     return {"v": 1, "src": src, "mode": "ground_truth" if src == "ue" else "stereo", "t": 0, "events": events}
 
 
-def ev(i, cls, az):
-    return {"id": i, "cls": cls, "conf": 1, "az": az, "fb": 1, "level": 0.5}
+def ev(i, cls, az, fb=1):
+    return {"id": i, "cls": cls, "conf": 1, "az": az, "fb": fb, "level": 0.5}
 
 
 def rec(recv, src, events):
@@ -43,6 +43,17 @@ class CompareTest(unittest.TestCase):
     def test_front_back(self):
         r = compare([rec(0.0, "ue", [ev(1, "Door", 150)]), rec(0.2, "model", [ev(9, "Door", 30)])], max_az_err=180.0)
         self.assertEqual(r["front_back_rate"], 1.0)
+
+    def test_folded_stereo_pairs_by_mirror(self):
+        # A stereo model folds 150 to 30 (fb 0): it is found, and counted as a front/back confusion.
+        r = compare([rec(0.0, "ue", [ev(1, "Door", 150)]), rec(0.2, "model", [ev(9, "Door", 30, fb=0)])])
+        self.assertEqual(r["recall"], 1.0)
+        self.assertEqual(r["front_back_rate"], 1.0)
+        self.assertAlmostEqual(r["az_mae"], 120.0)
+
+    def test_trusted_azimuth_does_not_use_mirror(self):
+        r = compare([rec(0.0, "ue", [ev(1, "Door", 150)]), rec(0.2, "model", [ev(9, "Door", 30, fb=1)])])
+        self.assertEqual(r["recall"], 0.0)
 
     def test_repeated_frames_are_one_onset(self):
         records = [rec(0.03 * k, "ue", [ev(1, "Door", 0)]) for k in range(10)]
