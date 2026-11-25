@@ -115,3 +115,15 @@ def test_cli_file_input(tmp_path):
                 pass
         assert proc.returncode == 0
     assert any(m["mode"] == "surround" and m["events"] for m in messages)
+
+
+def test_rise_db_from_config():
+    analyzer, _, _ = make(rise_db=30.0)
+    assert analyzer.onset.rise_db == 30.0
+    # Steady noise, then a +20 dB burst: onset at the default 9 dB, none at 30 dB.
+    steady = np.random.default_rng(5).standard_normal((SR, 2)).astype(np.float32) * 0.01
+    loud = steady.copy()
+    loud[-int(0.2 * SR):] *= 10.0
+    assert feed(analyzer, [steady] * 4 + [loud])[-1][1] == []
+    default, _, _ = make()
+    assert feed(default, [steady] * 4 + [loud])[-1][1] != []

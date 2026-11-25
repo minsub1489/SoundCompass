@@ -18,6 +18,9 @@ class AnalyzerConfig:
     default_threshold: float = 0.3
     max_events: int = 3
     reference_db: dict[str, float] = field(default_factory=dict)  # LevelDistance start values per class
+    rise_db: float = 9.0                                          # OnsetGate: rise over the band background
+    near_db: float = 6.0                                          # LevelDistance bin edges below the reference
+    mid_db: float = 18.0
 
 
 def _fold_front(az: float) -> float:
@@ -27,9 +30,9 @@ def _fold_front(az: float) -> float:
 class Analyzer:
     def __init__(self, classifier, spatial, spatial_name: str | None, config: AnalyzerConfig):
         self.classifier, self.spatial, self.spatial_name, self.config = classifier, spatial, spatial_name, config
-        self.onset = OnsetGate()
+        self.onset = OnsetGate(rise_db=config.rise_db)
         self.classes = ClassGate(config.class_thresholds, config.default_threshold)
-        self.distance = LevelDistance(config.reference_db)
+        self.distance = LevelDistance(config.reference_db, near_db=config.near_db, mid_db=config.mid_db)
         self.tracker = Tracker()
         self.bins: dict[int, str | None] = {}
         self.active = False
