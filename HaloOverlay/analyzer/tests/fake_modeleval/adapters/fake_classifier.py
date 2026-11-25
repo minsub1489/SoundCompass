@@ -10,4 +10,4 @@ class Adapter:
     def predict(self, audio, sr):
         self.calls += 1
         return {"class": "Door", "azimuth": None, "distance": None,
-                "scores": {"Door": 0.9, "Gunshot": 0.35, "Voice": 0.1}}
+                "scores": {"Door": 0.9, "Gunshot": 0.25, "Voice": 0.1}}

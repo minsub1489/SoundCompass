@@ -1,0 +1,7 @@
+{
+  "fb": {"gcc_phat": 0.0},
+  "class_thresholds": {},
+  "default_threshold": 0.3,
+  "max_events": 3,
+  "reference_db": {}
+}
