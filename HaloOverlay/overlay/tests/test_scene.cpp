@@ -154,6 +154,16 @@ static void mirrored_marks_share_the_icon_cap()
     CHECK(std::count_if(marks.begin(), marks.end(), [](const Mark& m) { return m.marker; }) == 4);
 }
 
+static void level_is_db_mapped()
+{
+    // level = (dB + 60) / 60, so it is the loudness term itself (weight 0.1 of the importance score).
+    Scene scene;
+    scene.Apply(Msg({Ev(1, "Door", -90, 1.0f, 0.9f), Ev(2, "Door", 90, 1.0f, 0.1f)}), 0.0);
+    const auto marks = scene.Snapshot(0.0);
+    CHECK(marks.size() == 2);
+    if (marks.size() == 2) { CHECK(Near(marks[0].importance - marks[1].importance, 0.08, 1e-4)); }
+}
+
 static void src_filter()
 {
     Scene scene;
@@ -190,6 +200,7 @@ int main()
     RUN(bin_sets_distance);
     RUN(many_events_cap_markers);
     RUN(mirrored_marks_share_the_icon_cap);
+    RUN(level_is_db_mapped);
     RUN(src_filter);
     RUN(level_feeds_trail);
     return g_failures;

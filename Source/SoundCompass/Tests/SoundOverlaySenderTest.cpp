@@ -28,7 +28,7 @@ bool FSoundOverlaySenderTest::RunTest(const FString& Parameters)
     Playing.AzimuthDegrees = 45.0f;
     Playing.DistanceMeters = 12.0f;
     Playing.ElevationMeters = 1.0f;
-    Playing.EstimatedListenerLevel = 1.7f;
+    Playing.EstimatedListenerDb = -20.0f;
     Playing.bPlaying = true;
     FSoundCompassSourceFrame Finished = Playing;
     Finished.SourceId = 8;
@@ -52,7 +52,12 @@ bool FSoundOverlaySenderTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("dist_m"), Event->GetNumberField(TEXT("dist_m")), 12.0);
     TestEqual(TEXT("dist_bin"), Event->GetStringField(TEXT("dist_bin")), FString(TEXT("mid")));
     TestEqual(TEXT("dist_src"), Event->GetStringField(TEXT("dist_src")), FString(TEXT("ue")));
-    TestEqual(TEXT("level clamped"), Event->GetNumberField(TEXT("level")), 1.0);
+    TestTrue(TEXT("level is (dB + 60) / 60"), FMath::IsNearlyEqual(Event->GetNumberField(TEXT("level")), 40.0 / 60.0, 1e-4));
+    FSoundCompassSourceFrame Loud = Playing;
+    Loud.EstimatedListenerDb = 6.0f;
+    TSharedPtr<FJsonObject> LoudRoot;
+    FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(BuildMessage({Loud}, 0.0)), LoudRoot);
+    TestEqual(TEXT("level clamped"), LoudRoot->GetArrayField(TEXT("events"))[0]->AsObject()->GetNumberField(TEXT("level")), 1.0);
     return true;
 }
 

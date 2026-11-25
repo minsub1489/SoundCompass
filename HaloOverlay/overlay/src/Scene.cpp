@@ -68,7 +68,7 @@ std::vector<Mark> Scene::Snapshot(double now) const
         if (alpha <= 0.0f) { continue; }
         std::optional<float> distance = track.last.distM;
         if (!distance && track.last.distBin) { distance = BinCentreMeters(*track.last.distBin); }
-        const float db = 20.0f * std::log10(std::max(track.last.level, 1e-4f));
+        const float db = track.last.level * 60.0f - 60.0f; // protocol: level = (dB + 60) / 60
         const float importance = SoundCompassImportance::Score(StyleOf(track.last.cls).baseImportance,
             distance ? *distance : std::numeric_limits<float>::quiet_NaN(), db);
         ranked.push_back({&track, alpha, importance});

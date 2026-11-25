@@ -73,7 +73,8 @@ FString BuildMessage(const TArray<FSoundCompassSourceFrame>& Frames, double Time
         Writer->WriteValue(TEXT("dist_bin"), Distance < 5.0f ? TEXT("near") : (Distance < 15.0f ? TEXT("mid") : TEXT("far")));
         Writer->WriteValue(TEXT("dist_src"), TEXT("ue"));
         Writer->WriteValue(TEXT("elev_m"), Frame.ElevationMeters);
-        Writer->WriteValue(TEXT("level"), FMath::Clamp(Frame.EstimatedListenerLevel, 0.0f, 1.0f));
+        // Same mapping as the analyzer and the in-game widget (LevelOf): -60 dB -> 0, 0 dB -> 1.
+        Writer->WriteValue(TEXT("level"), FMath::Clamp((Frame.EstimatedListenerDb + 60.0f) / 60.0f, 0.0f, 1.0f));
         Writer->WriteObjectEnd();
     }
     Writer->WriteArrayEnd();

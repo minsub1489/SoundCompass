@@ -111,7 +111,7 @@ A를 채택했습니다. 사용자가 스테레오와 7.1을 모두 지원하기
 - `fb`: 앞뒤 신뢰도(0~1)입니다. 1이면 `az`를 360° 그대로 믿습니다. 0이면 좌우 성분만 믿을 수 있다는 뜻이고, `az`는 앞쪽 반원(-90~90)으로 접은 값입니다.
 - `dist_m`, `dist_bin`, `elev_m`: 모르면 `null`입니다. `dist_m`이 있으면 오버레이는 그 값을 쓰고, 없으면 `dist_bin`을 씁니다.
 - `dist_src`: 거리의 출처입니다. `"model"`은 공간 어댑터, `"level"`은 크기 추정(7절), `"ue"`는 언리얼 정답입니다. 거리가 없으면 `null`입니다.
-- `level`: 리스너에서의 상대 크기(0~1)입니다. 오버레이는 이 값의 시간 기록으로 엔벨로프를 만듭니다.
+- `level`: 리스너에서의 크기를 dB로 잰 뒤 `(dB + 60) / 60`으로 0~1에 맞춘 값입니다(-60 dB 이하는 0, 0 dB 이상은 1). 오버레이는 이 값의 시간 기록으로 엔벨로프를 만듭니다.
 
 ## 7. 분석기
 
@@ -180,7 +180,7 @@ A를 채택했습니다. 사용자가 스테레오와 7.1을 모두 지원하기
 - `USoundVisualizationSubsystem`에 UDP 송신을 추가합니다. 콘솔 변수 `SoundCompass.ExternalOverlay`(기본 0)를 켜면 매 틱이 아니라 약 30 Hz로 보냅니다.
 - 보내는 값은 리스너 기준 프레임 값 그대로입니다(`AzimuthDegrees`, `DistanceMeters`, `ElevationMeters`). 게임 안 Halo처럼 캐릭터 기준으로 다시 재지 않습니다. 모델이 듣는 기준과 맞추기 위해서입니다.
 - 카테고리는 6절의 클래스 이름으로 바꿔 보냅니다. Conversation은 Voice, Alert는 Alarm, Throw는 Throwable로 보내고, 대응이 없는 Ambience와 Noise는 Other로 보냅니다. 단, Noise의 하위 이름에 heli, plane, aircraft, engine, car, traffic이 들어 있으면 Vehicle로 보냅니다.
-- `fb`는 1, `level`은 `EstimatedListenerLevel`, `id`는 `SourceId`입니다. 들리는 동안(`bPlaying`)인 프레임만 보냅니다.
+- `fb`는 1, `level`은 `Clamp((EstimatedListenerDb + 60) / 60, 0, 1)`, `id`는 `SourceId`입니다. 들리는 동안(`bPlaying`)인 프레임만 보냅니다.
 - 이 기능은 개발과 비교용이라 출시 빌드에서는 꺼 둡니다.
 
 ## 10. 검증
