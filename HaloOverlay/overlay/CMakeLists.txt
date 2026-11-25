@@ -11,6 +11,7 @@ set(UE_SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Source/SoundCompass/SoundVisuali
 
 add_library(halo_core STATIC
     src/Protocol.cpp
+    src/Scene.cpp
 )
 target_include_directories(halo_core PUBLIC src third_party ${UE_SHARED})
 
@@ -27,3 +28,4 @@ endfunction()
 
 halo_test(test_protocol)
 halo_test(test_geometry)
+halo_test(test_scene)
