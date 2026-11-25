@@ -15,6 +15,7 @@ style.textContent = `
   .crosshair::before, .crosshair::after { content: ''; position: absolute; background: #fff; }
   .crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; }
   .crosshair::after { top: 6px; left: 0; height: 2px; width: 14px; }
+  .crosshair.hit::before, .crosshair.hit::after { background: #ff3b3b; }
   table { border-collapse: collapse; } td { padding: 4px 12px; } td:last-child { text-align: right; font-weight: 600; }
 `;
 document.head.append(style);
@@ -66,7 +67,17 @@ export function showHud() {
     health: el('<div class="hud" style="bottom:20px;left:20px"></div>'),
     ammo: el('<div class="hud" style="bottom:20px;right:20px"></div>'),
   };
-  root.append(el('<div class="crosshair"></div>'), ...Object.values(hud));
+  hud.crosshair = el('<div class="crosshair"></div>');
+  root.append(...Object.values(hud));
+}
+
+// Own-shot feedback only: the crosshair turns red briefly when the player's shot hits a bot.
+let hitTimer = 0;
+export function flashCrosshairHit() {
+  if (!hud) return;
+  hud.crosshair.classList.add('hit');
+  clearTimeout(hitTimer);
+  hitTimer = setTimeout(() => hud?.crosshair.classList.remove('hit'), 120);
 }
 
 export function updateHud({ health, remainingS, crates, ammo, reloading }) {

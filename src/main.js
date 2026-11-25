@@ -109,7 +109,11 @@ async function run(map) {
     round.pause();
     player = createPlayer({
       scene, physics, map, round, camera, surfaceAt: built.surfaceAt, onSound,
-      onHit: (collider, damage) => bots.handleHit(collider, damage),
+      onHit: (collider, damage) => {
+        const hit = bots.handleHit(collider, damage);
+        if (hit) ui.flashCrosshairHit();
+        return hit;
+      },
       onShot: at => bots.notifyShot(at),
     });
     bots = createBots({ scene, physics, nav, map, player, round, camera, surfaceAt: built.surfaceAt, rng: createRng(map.seed + 1), onSound });
