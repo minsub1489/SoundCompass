@@ -23,9 +23,13 @@ static void round_trip()
     CHECK(receiver.Drain().empty());
     Send(47891, "one");
     Send(47891, "two");
-    CHECK(WaitForSingleObject(receiver.Event(), 1000) == WAIT_OBJECT_0);
-    Sleep(20);
-    const auto got = receiver.Drain();
+    // Loopback delivery can lag under load (seen once right after a build), so collect for up to 1 s.
+    std::vector<std::string> got;
+    for (int waited = 0; got.size() < 2 && waited < 1000; waited += 10)
+    {
+        WaitForSingleObject(receiver.Event(), 10);
+        for (std::string& datagram : receiver.Drain()) { got.push_back(std::move(datagram)); }
+    }
     CHECK(got.size() == 2 && got[0] == "one" && got[1] == "two");
 }
 
