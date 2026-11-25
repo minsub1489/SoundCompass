@@ -2,7 +2,8 @@
 export const FLOOR_HEIGHT = 3;
 const WALL_T = 0.3, SLAB_T = 0.2;
 const DOOR_W = 1.2, DOOR_H = 2.2, WIN_W = 1.2, WIN_Y0 = 1.0, WIN_Y1 = 2.0;
-const STAIR = { steps: 12, rise: 0.25, run: 0.3, width: 1.4 };
+// 1.6 m wide: recast drops the open-side ledge and erodes by the agent radius, so narrower stairs lose their navmesh.
+const STAIR = { steps: 12, rise: 0.25, run: 0.3, width: 1.6 };
 
 export const box = (x, y, z, w, h, d, extra = {}) => ({ pos: [x, y, z], size: [w, h, d], ...extra });
 // Box resting on height y0 (pos is the box centre).
@@ -52,6 +53,9 @@ export function building({ x, z, w, d, floors, doorSide = 'south', surface, colo
       }
     }
     stairs.push({ from: [stairX(i), fy, stairZ0], dir: '+z', ...STAIR, surface });
+    // Stairwell wall on the open side: stairs can only be entered from the front, for players and bots alike.
+    const openSide = i % 2 === 0 ? 1 : -1;
+    solids.push(block(stairX(i) + openSide * (STAIR.width / 2 + 0.075), fy, stairZ0 + stairLen / 2, 0.15, FLOOR_HEIGHT - SLAB_T, stairLen, extra));
   }
   // Slabs for floors 1..floors (the last one is the roof), each with a hole above the stairs below it.
   const ix0 = x - w / 2 + WALL_T, ix1 = x + w / 2 - WALL_T, iz0 = z - d / 2 + WALL_T, iz1 = z + d / 2 - WALL_T;

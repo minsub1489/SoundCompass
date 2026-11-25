@@ -37,7 +37,8 @@ export function createPhysics(RAPIER) {
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1] + footOffset, pos[2]));
     const collider = world.createCollider(RAPIER.ColliderDesc.capsule(halfHeight, radius).setCollisionGroups(groups(GROUP.CHARACTER)), body);
     const controller = world.createCharacterController(0.02);
-    controller.enableAutostep(0.3, 0.2, false);
+    // Matches the navmesh walkableClimb (0.6 m) so bots can follow paths that cut onto stairs from the side.
+    controller.enableAutostep(0.55, 0.2, false);
     controller.enableSnapToGround(0.3);
     controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
     controller.setApplyImpulsesToDynamicBodies(false);

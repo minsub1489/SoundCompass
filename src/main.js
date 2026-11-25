@@ -13,6 +13,8 @@ import { createInput } from './input.js';
 import { createPlayer } from './player.js';
 import { updateThirdPersonCamera } from './camera.js';
 import { createAudio } from './audio/engine.js';
+import { buildNav } from './nav.js';
+import { createBots } from './bots.js';
 import * as ui from './ui.js';
 
 const CRATE_PICKUP_M = 1.2;
@@ -66,10 +68,11 @@ async function run(map) {
   const onSound = (id, pos) => audio.playAt(id, pos);
   const built = buildMap(map, { scene, physics, onSound });
   physics.step(); // ray queries only see colliders after the first step
+  const navReady = buildNav(built.navMeshes);
   const pickUpCrate = createCrates(scene, map, createRng(map.seed));
   const input = createInput(canvas);
   const isBlocked = (from, to) => physics.raycast(from, to, { staticOnly: true }).hit;
-  let round = null, player = null, starting = false;
+  let round = null, player = null, bots = null, starting = false;
   let accumulator = 0, finished = false;
 
   const resize = () => {
@@ -80,14 +83,19 @@ async function run(map) {
   addEventListener('resize', resize);
   resize();
 
-  const requestLock = () => Promise.resolve(input.requestLock()).catch(() => ui.showPaused(requestLock));
+  // requestPointerLock can throw synchronously or reject; either way leave the round paused with a retry card.
+  const requestLock = async () => {
+    try { await input.requestLock(); } catch { ui.showPaused(requestLock); }
+  };
 
   ui.showStartGate(map.name, async () => {
     if (round || starting) return;
     starting = true;
+    let nav;
     try {
       await audio.resume();
       await loaded;
+      nav = await navReady;
     } catch (e) {
       starting = false;
       ui.showStartError(e.message);
@@ -99,8 +107,13 @@ async function run(map) {
     });
     // Time only runs while the pointer is locked, so a failed lock leaves the round paused, not running blind.
     round.pause();
-    player = createPlayer({ scene, physics, map, round, camera, surfaceAt: built.surfaceAt, onSound });
-    if (import.meta.env.DEV) window.__testbed = { round, player, physics, built, step, audio, scene, camera, pickUpCrate, isBlocked };
+    player = createPlayer({
+      scene, physics, map, round, camera, surfaceAt: built.surfaceAt, onSound,
+      onHit: (collider, damage) => bots.handleHit(collider, damage),
+      onShot: at => bots.notifyShot(at),
+    });
+    bots = createBots({ scene, physics, nav, map, player, round, camera, surfaceAt: built.surfaceAt, rng: createRng(map.seed + 1), onSound });
+    if (import.meta.env.DEV) window.__testbed = { round, player, bots, physics, built, step, audio, scene, camera, pickUpCrate, isBlocked };
     audio.startBed(map.ambience);
     audio.startBed(map.bgm);
     ui.showHud();
@@ -109,7 +122,9 @@ async function run(map) {
 
   function step(inputState) {
     player.fixedUpdate(FIXED_DT, inputState);
-    built.doors.forEach(d => d.update(FIXED_DT, [player.position]));
+    bots.update(FIXED_DT);
+    const characters = [player.position, ...bots.positions];
+    built.doors.forEach(d => d.update(FIXED_DT, characters));
     const crate = pickUpCrate(player.position);
     if (crate) { round.addCrate(); onSound('crate_pickup', crate); }
     physics.step();
@@ -132,6 +147,7 @@ async function run(map) {
         for (let i = 0; i < r.steps && !round.finished; i++) step(input);
       }
       player.syncMesh();
+      bots.syncMeshes(frameDt);
       updateThirdPersonCamera(camera, player.position, player.yaw, player.pitch, physics);
       audio.setListener(camera);
       audio.update(isBlocked);
