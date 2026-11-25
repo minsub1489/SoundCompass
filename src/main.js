@@ -146,7 +146,7 @@ async function run(map) {
         accumulator = r.accumulator;
         for (let i = 0; i < r.steps && !round.finished; i++) step(input);
       }
-      player.syncMesh();
+      player.syncMesh(frameDt);
       bots.syncMeshes(frameDt);
       updateThirdPersonCamera(camera, player.position, player.yaw, player.pitch, physics);
       audio.setListener(camera);

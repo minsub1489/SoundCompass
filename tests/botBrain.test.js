@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { decideBot, initialBotState } from '../src/botBrain.js';
-import { WEAPONS, BOT_REACTION_S, BOT_LOST_SIGHT_S } from '../src/config.js';
+import { WEAPONS, BOT_REACTION_S, BOT_LOST_SIGHT_S, BOT_GRACE_S } from '../src/config.js';
 
 const s0 = () => initialBotState();
 const per = o => ({ botPos: [100, 0, 100], seesPlayer: false, playerPos: [10, 0, 0], distance: 10, heardShotAt: null, patrol: [[0, 0, 0], [5, 0, 0]], isSniper: false, ...o });
 
 describe('decideBot', () => {
   it('초기 상태는 순찰', () => {
-    expect(s0()).toEqual({ mode: 'patrol', patrolIndex: 0, lastKnown: null, lostTimer: 0, reactTimer: 0 });
+    expect(s0()).toEqual({ mode: 'patrol', patrolIndex: 0, lastKnown: null, lostTimer: 0, reactTimer: 0, warned: false, graceLeft: BOT_GRACE_S });
   });
   it('사거리 안에서 보이면 반응 시간 뒤에 쏜다', () => {
     let r = decideBot(s0(), per({ seesPlayer: true }), WEAPONS.rifle, 0.1);
@@ -44,5 +44,25 @@ describe('decideBot', () => {
     const r = decideBot(s0(), per({ botPos: [0, 0, 0.5] }), WEAPONS.rifle, 0.1);
     expect(r.state.patrolIndex).toBe(1);
     expect(r.moveTo).toEqual([5, 0, 0]);
+  });
+  it('첫 사격 뒤 10초 동안은 맞히지 않는다', () => {
+    const seen = per({ seesPlayer: true });
+    let r = decideBot(s0(), seen, WEAPONS.rifle, BOT_REACTION_S);
+    expect(r.fire).toBe(true); expect(r.lethal).toBe(false);
+    for (let t = 0; t < BOT_GRACE_S - 0.2; t += 0.1) { r = decideBot(r.state, seen, WEAPONS.rifle, 0.1); expect(r.lethal).toBe(false); }
+    r = decideBot(r.state, seen, WEAPONS.rifle, 0.1);
+    r = decideBot(r.state, seen, WEAPONS.rifle, 0.1);
+    r = decideBot(r.state, seen, WEAPONS.rifle, 0.1);
+    expect(r.fire).toBe(true); expect(r.lethal).toBe(true);
+  });
+  it('순찰로 돌아가면 유예 시간이 다시 시작된다', () => {
+    const seen = per({ seesPlayer: true });
+    let r = decideBot(s0(), seen, WEAPONS.rifle, BOT_REACTION_S);
+    r = decideBot(r.state, seen, WEAPONS.rifle, BOT_GRACE_S + 1);
+    expect(r.lethal).toBe(true);
+    r = decideBot(r.state, per(), WEAPONS.rifle, BOT_LOST_SIGHT_S + 1);
+    expect(r.state.mode).toBe('patrol');
+    r = decideBot(r.state, seen, WEAPONS.rifle, BOT_REACTION_S);
+    expect(r.fire).toBe(true); expect(r.lethal).toBe(false);
   });
 });

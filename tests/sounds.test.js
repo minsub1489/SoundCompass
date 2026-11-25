@@ -10,7 +10,7 @@ describe('SOUNDS', () => {
     expect(missing).toEqual([]);
   });
   it('필수 id가 모두 있다', () => {
-    for (const id of ['player_rifle_shot', 'rifle_shot', 'shotgun_shot', 'sniper_shot', 'rifle_reload', 'shotgun_pump', 'sniper_bolt', 'knife_swing', 'knife_hit', 'step_concrete', 'step_dirt', 'step_metal', 'land', 'door_open', 'door_close', 'crate_pickup', 'hit_taken', 'death', 'amb_urban', 'amb_warehouse', 'amb_forest', 'bgm_urban', 'bgm_warehouse', 'bgm_forest'])
+    for (const id of ['player_rifle_shot', 'rifle_shot', 'shotgun_shot', 'sniper_shot', 'rifle_reload', 'shotgun_pump', 'sniper_bolt', 'knife_swing', 'knife_hit', 'bullet_whiz', 'bullet_impact', 'step_concrete', 'step_dirt', 'step_metal', 'land', 'door_open', 'door_close', 'crate_pickup', 'hit_taken', 'death', 'amb_urban', 'amb_warehouse', 'amb_forest', 'bgm_urban', 'bgm_warehouse', 'bgm_forest'])
       expect(SOUNDS[id], id).toBeDefined();
   });
   it('무기와 맵이 쓰는 소리 id가 모두 있다', () => {

@@ -15,6 +15,8 @@ export const SHOT_HEARING_M = 40;
 export const BOT_FOV_DEG = 110;
 export const BOT_REACTION_S = 0.5;
 export const BOT_LOST_SIGHT_S = 8;
+// After a bot first fires at the player, every attack misses for this long so the player can react to the sound.
+export const BOT_GRACE_S = 10;
 
 // Tuned so an idle player is hurt often but not killed every 30 s; adjust after real playtests.
 export const WEAPONS = {

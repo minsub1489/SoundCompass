@@ -3,6 +3,7 @@ import { WEAPONS, PLAYER_MAX_HEALTH } from './config.js';
 import { createGun } from './weapons.js';
 import { isSurpriseHit } from './round.js';
 import { forwardOf, rightOf, PITCH_LIMIT } from './camera.js';
+import { createWeaponModel, createTracer } from './weaponModels.js';
 
 const WALK = 4.5, RUN = 7, JUMP = 5, GRAVITY = 18, MOUSE_SENS = 0.0022;
 const STEP_WALK_S = 0.5, STEP_RUN_S = 0.33, CHEST = 1.2;
@@ -11,6 +12,9 @@ export function createPlayer({ scene, physics, map, round, camera, surfaceAt, on
   const character = physics.createCharacter(map.playerSpawn);
   const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 8), new THREE.MeshLambertMaterial({ color: 0x2f6fd6 }));
   scene.add(mesh);
+  const model = createWeaponModel('playerRifle');
+  mesh.add(model.group);
+  const tracer = createTracer(scene);
   const gun = createGun(WEAPONS.playerRifle);
   const toCentre = [-map.playerSpawn[0], 0, -map.playerSpawn[2]];
   let yaw = Math.atan2(-toCentre[0], -toCentre[2]), pitch = 0;
@@ -37,7 +41,9 @@ export function createPlayer({ scene, physics, map, round, camera, surfaceAt, on
     camera.getWorldDirection(dir);
     const to = [from[0] + dir.x * WEAPONS.playerRifle.rangeM, from[1] + dir.y * WEAPONS.playerRifle.rangeM, from[2] + dir.z * WEAPONS.playerRifle.rangeM];
     const hit = physics.raycast(from, to, { exclude: character.collider });
-    if (hit.hit) onHit(hit.collider, WEAPONS.playerRifle.damage);
+    model.flash();
+    tracer.show(model.tipWorld(), hit.hit ? hit.point : to);
+    if (hit.hit && !onHit(hit.collider, WEAPONS.playerRifle.damage)) onSound('bullet_impact', hit.point);
   }
 
   function fixedUpdate(dt, input) {
@@ -94,7 +100,9 @@ export function createPlayer({ scene, physics, map, round, camera, surfaceAt, on
     }
   }
 
-  function syncMesh() {
+  function syncMesh(dt) {
+    model.update(dt);
+    tracer.update(dt);
     const p = pos();
     mesh.position.set(p[0], p[1] + 0.9, p[2]);
     mesh.rotation.y = yaw;

@@ -6,6 +6,7 @@ import { createGun } from './weapons.js';
 import { decideBot, initialBotState } from './botBrain.js';
 import { chooseRespawnIndex } from './spawn.js';
 import { forwardOf } from './camera.js';
+import { createWeaponModel } from './weaponModels.js';
 
 const COLORS = { rifle: 0xd03030, shotgun: 0xe08020, sniper: 0x8040c0, knife: 0x202020 };
 const SPEED = { patrol: 3.5, chase: 5, attack: 3.5 };
@@ -13,6 +14,8 @@ const KNIFE_CHASE_SPEED = 6.5;
 const GRAVITY = 18, EYE = 1.6, CHEST = 1.2, MUZZLE = 1.4, SIGHT_M = 100;
 const REPATH_S = 0.5, WAYPOINT_M = 0.4, AFTER_FIRE_DELAY_S = 0.35;
 const STEP_WALK_S = 0.5, STEP_RUN_S = 0.33;
+// Grace-period shots aim this far beside the player's head so they pass close enough to be heard.
+const MISS_MIN_M = 1.2, MISS_SPREAD_M = 0.8, WHIZ_M = 4, HEAD = 1.6;
 
 const add = (p, dy) => [p[0], p[1] + dy, p[2]];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -36,9 +39,11 @@ export function createBots({ scene, physics, nav, map, player, round, camera, su
     const material = new THREE.MeshLambertMaterial({ color: COLORS[spec.weapon] });
     const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 8), material);
     scene.add(mesh);
+    const model = createWeaponModel(spec.weapon);
+    mesh.add(model.group);
     const first = spec.patrol[1] ?? spec.patrol[0];
     const bot = {
-      spec, def, character, mesh, material, gun: createGun(def),
+      spec, def, character, mesh, material, model, gun: createGun(def),
       state: initialBotState(), health: BOT_MAX_HEALTH, alive: true, respawnTimer: 0,
       yaw: Math.atan2(-(first[0] - spec.spawn[0]), -(first[2] - spec.spawn[2])) || 0,
       vy: 0, grounded: true, time: 0, stepTimer: 0, wasReloading: false, flash: 0,
@@ -64,24 +69,47 @@ export function createBots({ scene, physics, nav, map, player, round, camera, su
     return out;
   }
 
-  function fire(bot, distance) {
+  // A point beside the player's head, perpendicular to the line of fire, so a grace-period shot flies past.
+  function missPoint(from, pp) {
+    const head = add(pp, HEAD), d = sub(head, from), h = Math.hypot(d[0], d[2]) || 1;
+    const side = rng() < 0.5 ? -1 : 1, off = MISS_MIN_M + rng() * MISS_SPREAD_M;
+    return [head[0] - (d[2] / h) * side * off, head[1] + rng() * 0.6, head[2] + (d[0] / h) * side * off];
+  }
+
+  // Bullet fly-by: the point on the shot closest to the player's head, if it passes near.
+  function whizPoint(from, to, pp) {
+    const head = add(pp, HEAD), d = sub(to, from), l2 = d[0] ** 2 + d[1] ** 2 + d[2] ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((head[0] - from[0]) * d[0] + (head[1] - from[1]) * d[1] + (head[2] - from[2]) * d[2]) / l2));
+    const c = [from[0] + d[0] * t, from[1] + d[1] * t, from[2] + d[2] * t];
+    return len(sub(c, head)) <= WHIZ_M ? c : null;
+  }
+
+  function fire(bot, distance, lethal) {
     const p = pos(bot), pp = player.position;
     if (bot.def.magSize === 0) {
+      bot.model.swing();
       onSound(bot.def.fireSound, add(p, CHEST));
-      if (distance <= bot.def.rangeM) { player.takeDamage(bot.def.damage, p); onSound('knife_hit', add(pp, CHEST)); }
+      if (lethal && distance <= bot.def.rangeM) { player.takeDamage(bot.def.damage, p); onSound('knife_hit', add(pp, CHEST)); }
       return;
     }
     const muzzle = add(p, MUZZLE);
+    bot.model.flash();
     onSound(bot.def.fireSound, muzzle);
     if (bot.def.afterFireSound) bot.pending.push({ id: bot.def.afterFireSound, at: bot.time + AFTER_FIRE_DELAY_S });
-    const aim = sub(add(pp, CHEST), muzzle);
-    const spread = (bot.def.spreadDeg * Math.PI) / 180;
+    const aim = sub(lethal ? add(pp, CHEST) : missPoint(muzzle, pp), muzzle);
+    const spread = lethal ? (bot.def.spreadDeg * Math.PI) / 180 : 0;
     const yaw = Math.atan2(aim[0], aim[2]) + (rng() * 2 - 1) * spread;
     const pitch = Math.atan2(aim[1], Math.hypot(aim[0], aim[2])) + (rng() * 2 - 1) * spread;
     const dir = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)];
     const end = [muzzle[0] + dir[0] * bot.def.rangeM, muzzle[1] + dir[1] * bot.def.rangeM, muzzle[2] + dir[2] * bot.def.rangeM];
     const hit = physics.raycast(muzzle, end, { exclude: bot.character.collider });
-    if (hit.hit && hit.collider.handle === player.collider.handle) {
+    const hitPlayer = hit.hit && hit.collider.handle === player.collider.handle;
+    if (!hitPlayer) {
+      const whiz = whizPoint(muzzle, hit.hit ? hit.point : end, pp);
+      if (whiz) onSound('bullet_whiz', whiz);
+      if (hit.hit) onSound('bullet_impact', hit.point);
+    }
+    if (lethal && hitPlayer) {
       // Shotgun damage falls off linearly to 30% at the end of its range.
       const falloff = bot.def.id === 'shotgun' ? 1 - 0.7 * Math.min(1, distance / bot.def.rangeM) : 1;
       player.takeDamage(Math.round(bot.def.damage * falloff), p);
@@ -144,7 +172,7 @@ export function createBots({ scene, physics, nav, map, player, round, camera, su
       }
     } else bot.stepTimer = 0;
 
-    if (d.fire && bot.gun.tryFire(bot.time)) fire(bot, per.distance);
+    if (d.fire && bot.gun.tryFire(bot.time)) fire(bot, per.distance, d.lethal);
     bot.gun.update(bot.time);
     if (bot.gun.reloading && !bot.wasReloading && bot.def.reloadSound) onSound(bot.def.reloadSound, add(pos(bot), MUZZLE));
     bot.wasReloading = bot.gun.reloading;
@@ -162,6 +190,7 @@ export function createBots({ scene, physics, nav, map, player, round, camera, su
         const p = pos(b);
         b.mesh.position.set(p[0], p[1] + 0.9, p[2]);
         b.mesh.rotation.y = b.yaw;
+        b.model.update(dt);
         b.flash = Math.max(0, b.flash - dt);
         b.material.emissive.setHex(b.flash > 0 ? 0xffffff : 0x000000);
       }

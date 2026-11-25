@@ -1,14 +1,22 @@
-import { BOT_REACTION_S, BOT_LOST_SIGHT_S } from './config.js';
+import { BOT_REACTION_S, BOT_LOST_SIGHT_S, BOT_GRACE_S } from './config.js';
 
 const ARRIVE_M = 1;
 const dist2D = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
-export const initialBotState = () => ({ mode: 'patrol', patrolIndex: 0, lastKnown: null, lostTimer: 0, reactTimer: 0 });
+export const initialBotState = () => ({ mode: 'patrol', patrolIndex: 0, lastKnown: null, lostTimer: 0, reactTimer: 0, warned: false, graceLeft: BOT_GRACE_S });
 
-// Pure decision step: perception in, next state + where to move + whether to fire out.
+// Pure decision step: perception in, next state + where to move + whether to fire + whether a shot may hit.
 export function decideBot(state, p, weapon, dt) {
+  const s = decideMove(state, p, weapon, dt);
+  if (s.fire) s.state.warned = true;
+  // lethal only after BOT_GRACE_S since this engagement's first attack.
+  return { ...s, lethal: s.fire && s.state.warned && s.state.graceLeft <= 0 };
+}
+
+function decideMove(state, p, weapon, dt) {
   const s = { ...state };
   const melee = weapon.magSize === 0;
+  if (s.warned) s.graceLeft -= dt;
 
   if (p.seesPlayer) {
     s.lastKnown = p.playerPos;
@@ -31,7 +39,7 @@ export function decideBot(state, p, weapon, dt) {
       s.mode = 'chase';
       return { state: s, moveTo: s.lastKnown, fire: false };
     }
-    Object.assign(s, { mode: 'patrol', lastKnown: null, lostTimer: 0 });
+    Object.assign(s, { mode: 'patrol', lastKnown: null, lostTimer: 0, warned: false, graceLeft: BOT_GRACE_S });
   }
 
   let target = p.patrol[s.patrolIndex % p.patrol.length];

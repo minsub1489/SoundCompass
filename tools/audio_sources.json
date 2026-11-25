@@ -1,47 +1,220 @@
 {
   "cc0Root": "C:/Users/Home/Documents/Github/SoundCompass/Saved/SoundTestSetup/wav",
   "items": [
-    { "id": "player_rifle_shot", "kind": "sfx", "source": "cc0", "path": "OneShots/Gunshots/SW_Gun_Rifle_AR15.wav", "maxSeconds": 2.5 },
-    { "id": "rifle_shot", "kind": "sfx", "source": "cc0", "path": "OneShots/Gunshots/SW_Gun_Rifle_AR15.wav", "maxSeconds": 2.5 },
-    { "id": "shotgun_shot", "kind": "sfx", "source": "cc0", "path": "OneShots/Gunshots/SW_Gun_Shotgun_Model12.wav", "maxSeconds": 2.5 },
-    { "id": "sniper_shot", "kind": "sfx", "source": "cc0", "path": "OneShots/Gunshots/SW_Gun_Rifle_MosinNagant.wav", "maxSeconds": 3 },
-    { "id": "step_concrete", "kind": "sfx", "variants": 6, "source": "cc0", "path": "OneShots/Footsteps/SW_Footstep_Concrete_{n}.wav", "maxSeconds": 0.6 },
-    { "id": "step_dirt", "kind": "sfx", "variants": 6, "source": "cc0", "path": "OneShots/Footsteps/SW_Footstep_Gravel_{n}.wav", "maxSeconds": 0.6 },
-    { "id": "door_open", "kind": "sfx", "source": "cc0", "path": "OneShots/Door/SW_DoorOpen.wav", "maxSeconds": 2.5 },
-    { "id": "door_close", "kind": "sfx", "source": "cc0", "path": "OneShots/Door/SW_DoorClose.wav", "maxSeconds": 2 },
-
-    { "id": "rifle_reload", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 11, "maxSeconds": 2.5,
-      "prompt": "assault rifle magazine reload foley, magazine release click, new magazine inserted, charging handle pulled and released, close mic, dry, no gunshot, no music" },
-    { "id": "shotgun_pump", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 12, "maxSeconds": 1.2,
-      "prompt": "pump action shotgun racking, single pump slide pulled back and pushed forward, metallic clack, close mic, dry, no gunshot, no music" },
-    { "id": "sniper_bolt", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 13, "maxSeconds": 1.5,
-      "prompt": "bolt action rifle bolt cycling, bolt lifted pulled back pushed forward and locked, metallic clicks, close mic, dry, no gunshot, no music" },
-    { "id": "knife_swing", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 14, "maxSeconds": 0.8,
-      "prompt": "single fast knife swing whoosh through the air, one short swish, close mic, dry, no music" },
-    { "id": "knife_hit", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 15, "maxSeconds": 1,
-      "prompt": "single knife stab impact into a body, short dull wet thud, one hit, close mic, dry, no music" },
-    { "id": "step_metal", "kind": "sfx", "variants": 6, "source": "sa3", "seconds": 3, "seed": 100, "maxSeconds": 0.6,
-      "prompt": "one single footstep, heavy boot on a steel grating catwalk, metallic clank, close mic, dry, no music" },
-    { "id": "land", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 16, "maxSeconds": 1,
-      "prompt": "person landing on the ground after a jump, heavy boots thud with gear rattle, single impact, dry, no music" },
-    { "id": "crate_pickup", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 17, "maxSeconds": 1.2,
-      "prompt": "opening a small supply crate and grabbing an item, latch click, lid creak, plastic rustle, close mic, dry, no music" },
-    { "id": "hit_taken", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 18, "maxSeconds": 1,
-      "prompt": "bullet impact hitting a body wearing armor, short punchy thud, single hit, dry, no music" },
-    { "id": "death", "kind": "sfx", "source": "sa3", "seconds": 3, "seed": 19, "maxSeconds": 2.5,
-      "prompt": "man grunting in pain and collapsing onto the ground, body fall with equipment rattle, dry, no music" },
-
-    { "id": "amb_urban", "kind": "amb", "source": "sa3", "seconds": 30, "seed": 21,
-      "prompt": "outdoor city back alley ambience, light wind, distant traffic hum, faint far away city noise, steady, no voices, no music" },
-    { "id": "amb_warehouse", "kind": "amb", "source": "sa3", "seconds": 30, "seed": 22,
-      "prompt": "large empty industrial warehouse interior ambience, ventilation fan hum, low machinery drone, occasional faint metal creak, steady, no voices, no music" },
-    { "id": "amb_forest", "kind": "amb", "source": "sa3", "seconds": 30, "seed": 23,
-      "prompt": "forest ambience, wind through trees, leaves rustling, occasional distant birds, steady, no voices, no music" },
-    { "id": "bgm_urban", "kind": "bgm", "source": "sa3", "seconds": 60, "seed": 31,
-      "prompt": "tense cinematic action game background music, urban, pulsing synth bass, low steady drums, dark mood, instrumental, no vocals, loopable, 100 bpm" },
-    { "id": "bgm_warehouse", "kind": "bgm", "source": "sa3", "seconds": 60, "seed": 32,
-      "prompt": "industrial tense shooter game background music, metallic percussion, droning dark synths, instrumental, no vocals, loopable, 95 bpm" },
-    { "id": "bgm_forest", "kind": "bgm", "source": "sa3", "seconds": 60, "seed": 33,
-      "prompt": "ominous suspense background music for a stealth game in a forest, low strings, sparse percussion, eerie pads, instrumental, no vocals, loopable, 80 bpm" }
+    {
+      "id": "player_rifle_shot",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Gunshots/SW_Gun_Rifle_AR15.wav",
+      "maxSeconds": 2.5
+    },
+    {
+      "id": "rifle_shot",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Gunshots/SW_Gun_Rifle_AR15.wav",
+      "maxSeconds": 2.5
+    },
+    {
+      "id": "shotgun_shot",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Gunshots/SW_Gun_Shotgun_Model12.wav",
+      "maxSeconds": 2.5
+    },
+    {
+      "id": "sniper_shot",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Gunshots/SW_Gun_Rifle_MosinNagant.wav",
+      "maxSeconds": 3
+    },
+    {
+      "id": "step_concrete",
+      "kind": "sfx",
+      "variants": 6,
+      "source": "cc0",
+      "path": "OneShots/Footsteps/SW_Footstep_Concrete_{n}.wav",
+      "maxSeconds": 0.6
+    },
+    {
+      "id": "step_dirt",
+      "kind": "sfx",
+      "variants": 6,
+      "source": "cc0",
+      "path": "OneShots/Footsteps/SW_Footstep_Gravel_{n}.wav",
+      "maxSeconds": 0.6
+    },
+    {
+      "id": "door_open",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Door/SW_DoorOpen.wav",
+      "maxSeconds": 2.5
+    },
+    {
+      "id": "door_close",
+      "kind": "sfx",
+      "source": "cc0",
+      "path": "OneShots/Door/SW_DoorClose.wav",
+      "maxSeconds": 2
+    },
+    {
+      "id": "rifle_reload",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 11,
+      "maxSeconds": 2.5,
+      "prompt": "assault rifle magazine reload foley, magazine release click, new magazine inserted, charging handle pulled and released, close mic, dry, no gunshot, no music"
+    },
+    {
+      "id": "shotgun_pump",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 12,
+      "maxSeconds": 1.2,
+      "prompt": "pump action shotgun racking, single pump slide pulled back and pushed forward, metallic clack, close mic, dry, no gunshot, no music"
+    },
+    {
+      "id": "sniper_bolt",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 13,
+      "maxSeconds": 1.5,
+      "prompt": "bolt action rifle bolt cycling, bolt lifted pulled back pushed forward and locked, metallic clicks, close mic, dry, no gunshot, no music"
+    },
+    {
+      "id": "knife_swing",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 14,
+      "maxSeconds": 0.8,
+      "prompt": "single fast knife swing whoosh through the air, one short swish, close mic, dry, no music"
+    },
+    {
+      "id": "knife_hit",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 15,
+      "maxSeconds": 1,
+      "prompt": "single knife stab impact into a body, short dull wet thud, one hit, close mic, dry, no music"
+    },
+    {
+      "id": "step_metal",
+      "kind": "sfx",
+      "variants": 6,
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 100,
+      "maxSeconds": 0.6,
+      "prompt": "one single footstep, heavy boot on a steel grating catwalk, metallic clank, close mic, dry, no music"
+    },
+    {
+      "id": "land",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 16,
+      "maxSeconds": 1,
+      "prompt": "person landing on the ground after a jump, heavy boots thud with gear rattle, single impact, dry, no music"
+    },
+    {
+      "id": "crate_pickup",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 17,
+      "maxSeconds": 1.2,
+      "prompt": "opening a small supply crate and grabbing an item, latch click, lid creak, plastic rustle, close mic, dry, no music"
+    },
+    {
+      "id": "hit_taken",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 18,
+      "maxSeconds": 1,
+      "prompt": "bullet impact hitting a body wearing armor, short punchy thud, single hit, dry, no music"
+    },
+    {
+      "id": "death",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 19,
+      "maxSeconds": 2.5,
+      "prompt": "man grunting in pain and collapsing onto the ground, body fall with equipment rattle, dry, no music"
+    },
+    {
+      "id": "amb_urban",
+      "kind": "amb",
+      "source": "sa3",
+      "seconds": 30,
+      "seed": 21,
+      "prompt": "outdoor city back alley ambience, light wind, distant traffic hum, faint far away city noise, steady, no voices, no music"
+    },
+    {
+      "id": "amb_warehouse",
+      "kind": "amb",
+      "source": "sa3",
+      "seconds": 30,
+      "seed": 22,
+      "prompt": "large empty industrial warehouse interior ambience, ventilation fan hum, low machinery drone, occasional faint metal creak, steady, no voices, no music"
+    },
+    {
+      "id": "amb_forest",
+      "kind": "amb",
+      "source": "sa3",
+      "seconds": 30,
+      "seed": 23,
+      "prompt": "forest ambience, wind through trees, leaves rustling, occasional distant birds, steady, no voices, no music"
+    },
+    {
+      "id": "bgm_urban",
+      "kind": "bgm",
+      "source": "sa3",
+      "seconds": 60,
+      "seed": 31,
+      "prompt": "tense cinematic action game background music, urban, pulsing synth bass, low steady drums, dark mood, instrumental, no vocals, loopable, 100 bpm"
+    },
+    {
+      "id": "bgm_warehouse",
+      "kind": "bgm",
+      "source": "sa3",
+      "seconds": 60,
+      "seed": 32,
+      "prompt": "industrial tense shooter game background music, metallic percussion, droning dark synths, instrumental, no vocals, loopable, 95 bpm"
+    },
+    {
+      "id": "bgm_forest",
+      "kind": "bgm",
+      "source": "sa3",
+      "seconds": 60,
+      "seed": 33,
+      "prompt": "ominous suspense background music for a stealth game in a forest, low strings, sparse percussion, eerie pads, instrumental, no vocals, loopable, 80 bpm"
+    },
+    {
+      "id": "bullet_whiz",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 41,
+      "maxSeconds": 0.8,
+      "prompt": "a single bullet whizzing closely past the ear, sharp supersonic crack and short whoosh fly-by, close mic, dry, no gunshot, no music"
+    },
+    {
+      "id": "bullet_impact",
+      "kind": "sfx",
+      "source": "sa3",
+      "seconds": 3,
+      "seed": 42,
+      "maxSeconds": 1,
+      "prompt": "a single bullet impact hitting a concrete wall, sharp crack with small debris and dust, short ricochet, dry, no gunshot, no music"
+    }
   ]
 }

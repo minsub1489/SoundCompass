@@ -10,6 +10,8 @@ export const SOUNDS = {
   rifle_reload: one('rifle_reload', 'sfx', 0.7),
   shotgun_pump: one('shotgun_pump', 'sfx', 0.8),
   sniper_bolt: one('sniper_bolt', 'sfx', 0.8),
+  bullet_whiz: one('bullet_whiz', 'sfx', 0.9),
+  bullet_impact: one('bullet_impact', 'sfx', 0.8),
   knife_swing: one('knife_swing', 'sfx', 0.8),
   knife_hit: one('knife_hit', 'sfx', 0.9),
   step_concrete: many('step_concrete', 6, 'sfx', 0.6),
