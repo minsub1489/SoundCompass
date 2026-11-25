@@ -26,3 +26,4 @@ function(halo_test name)
 endfunction()
 
 halo_test(test_protocol)
+halo_test(test_geometry)
