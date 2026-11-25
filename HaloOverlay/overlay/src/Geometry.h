@@ -92,8 +92,8 @@ inline Vec2 EdgePoint(float azimuthDegrees, const Vec2& halfExtent)
 /** 1 at the listener, 0 at farMeters and beyond, log-shaped so near distances differ most. */
 inline float Nearness(float meters, float farMeters)
 {
-    const float far = std::log(1.0f + std::max(1.0f, farMeters) / 1.5f);
-    return 1.0f - std::clamp(std::log(1.0f + std::max(0.0f, meters) / 1.5f) / far, 0.0f, 1.0f);
+    const float farLog = std::log(1.0f + std::max(1.0f, farMeters) / 1.5f);
+    return 1.0f - std::clamp(std::log(1.0f + std::max(0.0f, meters) / 1.5f) / farLog, 0.0f, 1.0f);
 }
 
 struct Box2

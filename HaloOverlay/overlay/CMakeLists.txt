@@ -15,14 +15,16 @@ add_library(halo_core STATIC
     src/Config.cpp
     src/UdpReceiver.cpp
     src/OverlayWindow.cpp
+    src/Painter.cpp
 )
 target_include_directories(halo_core PUBLIC src third_party ${UE_SHARED})
-target_link_libraries(halo_core PUBLIC d3d11 dxgi dcomp d2d1 ws2_32)
+target_link_libraries(halo_core PUBLIC d3d11 dxgi dcomp d2d1 dwrite windowscodecs ws2_32)
 
 add_executable(HaloOverlay WIN32 src/main.cpp)
 target_link_libraries(HaloOverlay PRIVATE halo_core)
 add_custom_command(TARGET HaloOverlay POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/halo_overlay.json $<TARGET_FILE_DIR:HaloOverlay>)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/halo_overlay.json $<TARGET_FILE_DIR:HaloOverlay>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/icons $<TARGET_FILE_DIR:HaloOverlay>/icons)
 
 enable_testing()
 function(halo_test name)
@@ -37,3 +39,5 @@ halo_test(test_geometry)
 halo_test(test_scene)
 halo_test(test_config)
 halo_test(test_udp)
+halo_test(test_painter windowscodecs)
+target_compile_definitions(test_painter PRIVATE HALO_ICONS_DIR=L"${CMAKE_CURRENT_SOURCE_DIR}/icons")

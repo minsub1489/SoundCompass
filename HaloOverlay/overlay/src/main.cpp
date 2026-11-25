@@ -1,7 +1,10 @@
 #include <string>
 
+#include <wincodec.h>
+
 #include "Config.h"
 #include "OverlayWindow.h"
+#include "Painter.h"
 #include "Protocol.h"
 #include "Scene.h"
 #include "UdpReceiver.h"
@@ -54,6 +57,8 @@ int SelfTestWindow(const halo::Config& config)
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
 {
+    // Physical pixels: the overlay must cover the monitor exactly and stay sharp at any scaling.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const halo::Config config = halo::LoadConfig(ExeDir() / "halo_overlay.json");
     if (std::wstring(commandLine).find(L"--selftest-window") != std::wstring::npos) { return SelfTestWindow(config); }
 
@@ -72,6 +77,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
     }
     Register(window.Hwnd(), kLabels, config.labelsHotkey);
     Register(window.Hwnd(), kQuit, config.quitHotkey);
+
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
+    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic));
+    halo::Painter painter(window.Begin(), wic.Get(), ExeDir() / "icons");
+    window.End();
+    halo::PaintParams params;
+    params.sizePixels = window.SizePixels();
+    params.pitchDegrees = config.viewPitchDegrees;
+    params.dpiScale = static_cast<float>(GetDpiForWindow(window.Hwnd())) / 96.0f;
 
     halo::SceneConfig sceneConfig;
     sceneConfig.srcFilter = config.src;
@@ -97,7 +112,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
         const bool idle = scene.Idle(now);
         if (!idle || !drawnIdle)
         {
+            params.labels = labels;
+            params.now = now;
             window.Begin();
+            painter.Paint(scene.Snapshot(now), params);
             window.End(); // blocks until vsync while sounds are visible
             drawnIdle = idle;
         }
