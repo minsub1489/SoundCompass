@@ -1,17 +1,21 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { FIXED_DT, MAX_STEPS_PER_FRAME } from './config.js';
+import { FIXED_DT, MAX_STEPS_PER_FRAME, MIN_CRATE_DIST_M } from './config.js';
 import { stepCount } from './fixedStep.js';
+import { createRng } from './rng.js';
 import { Round } from './round.js';
 import { downloadCsv } from './results.js';
+import { initialCrateIndices, nextCrateIndex } from './spawn.js';
 import { createPhysics } from './physics.js';
 import { buildMap } from './maps/build.js';
 import { MAPS } from './maps/index.js';
 import { createInput } from './input.js';
 import { createPlayer } from './player.js';
 import { updateThirdPersonCamera } from './camera.js';
+import { createAudio } from './audio/engine.js';
 import * as ui from './ui.js';
 
+const CRATE_PICKUP_M = 1.2;
 const params = new URLSearchParams(location.search);
 const map = MAPS[params.get('map')];
 
@@ -23,19 +27,49 @@ if (!map) {
   await run(map);
 }
 
+function createCrates(scene, map, rng) {
+  const geo = new THREE.BoxGeometry(0.6, 0.6, 0.6), mat = new THREE.MeshLambertMaterial({ color: 0xe0b020 });
+  const meshes = new Map();
+  const place = i => {
+    const m = new THREE.Mesh(geo, mat);
+    const c = map.crateCandidates[i];
+    m.position.set(c[0], c[1] + 0.3, c[2]);
+    scene.add(m);
+    meshes.set(i, m);
+  };
+  initialCrateIndices(map.crateCandidates, map.crateCount, rng).forEach(place);
+  // Returns the candidate position picked up this step, or null.
+  return function pickUp(playerPos) {
+    for (const [i, m] of meshes) {
+      const c = map.crateCandidates[i];
+      if (Math.hypot(c[0] - playerPos[0], c[2] - playerPos[2]) > CRATE_PICKUP_M || Math.abs(c[1] - playerPos[1]) > 1.5) continue;
+      const next = nextCrateIndex(map.crateCandidates, new Set(meshes.keys()), playerPos, rng, MIN_CRATE_DIST_M);
+      scene.remove(m);
+      meshes.delete(i);
+      if (next >= 0) place(next);
+      return c;
+    }
+    return null;
+  };
+}
+
 async function run(map) {
   await RAPIER.init();
   const audioOutput = params.get('out') === '7.1' ? '7.1' : 'binaural';
+  const audio = createAudio({ output: audioOutput });
+  const loaded = audio.load();
   const canvas = document.getElementById('game');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 300);
   const physics = createPhysics(RAPIER);
-  const onSound = () => {}; // wired to audio in Task 7
-  const built = buildMap(map, { scene, physics, onSound: (id, pos) => onSound(id, pos) });
+  const onSound = (id, pos) => audio.playAt(id, pos);
+  const built = buildMap(map, { scene, physics, onSound });
+  physics.step(); // ray queries only see colliders after the first step
+  const pickUpCrate = createCrates(scene, map, createRng(map.seed));
   const input = createInput(canvas);
-  let round = null;
-  let player = null;
+  const isBlocked = (from, to) => physics.raycast(from, to, { staticOnly: true }).hit;
+  let round = null, player = null, starting = false;
   let accumulator = 0, finished = false;
 
   const resize = () => {
@@ -46,25 +80,38 @@ async function run(map) {
   addEventListener('resize', resize);
   resize();
 
+  const requestLock = () => Promise.resolve(input.requestLock()).catch(() => ui.showPaused(requestLock));
+
   ui.showStartGate(map.name, async () => {
-    if (round) return;
+    if (round || starting) return;
+    starting = true;
+    try {
+      await audio.resume();
+      await loaded;
+    } catch (e) {
+      starting = false;
+      ui.showStartError(e.message);
+      return;
+    }
     round = new Round({
       participantId: params.get('pid') ?? '', condition: params.get('cond') ?? '', mapId: map.id,
       audioOutput, isPractice: map.id === 'practice', startedAt: new Date(),
     });
     // Time only runs while the pointer is locked, so a failed lock leaves the round paused, not running blind.
     round.pause();
-    player = createPlayer({ scene, physics, map, round, camera, surfaceAt: built.surfaceAt, onSound: (id, pos) => onSound(id, pos) });
-    if (import.meta.env.DEV) window.__testbed = { round, player, physics, built, step };
+    player = createPlayer({ scene, physics, map, round, camera, surfaceAt: built.surfaceAt, onSound });
+    if (import.meta.env.DEV) window.__testbed = { round, player, physics, built, step, audio, scene, camera, pickUpCrate, isBlocked };
+    audio.startBed(map.ambience);
+    audio.startBed(map.bgm);
     ui.showHud();
     requestLock();
   });
 
-  const requestLock = () => Promise.resolve(input.requestLock()).catch(() => ui.showPaused(requestLock));
-
   function step(inputState) {
     player.fixedUpdate(FIXED_DT, inputState);
     built.doors.forEach(d => d.update(FIXED_DT, [player.position]));
+    const crate = pickUpCrate(player.position);
+    if (crate) { round.addCrate(); onSound('crate_pickup', crate); }
     physics.step();
     round.tick(FIXED_DT);
   }
@@ -86,6 +133,8 @@ async function run(map) {
       }
       player.syncMesh();
       updateThirdPersonCamera(camera, player.position, player.yaw, player.pitch, physics);
+      audio.setListener(camera);
+      audio.update(isBlocked);
       ui.updateHud({ health: player.health, remainingS: round.remainingS, crates: round.stats.crates, ammo: player.ammo, reloading: player.reloading });
       if (round.finished) {
         finished = true;
