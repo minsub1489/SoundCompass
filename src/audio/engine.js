@@ -56,7 +56,8 @@ export function createAudio({ output }) {
 
   const occPoint = p => [p[0], p[1] + OCC_LIFT_M, p[2]];
 
-  function placeVoice(v, now) {
+  // immediate: first placement sets values outright so a transient (gunshot) is not faded in from 0.
+  function placeVoice(v, now, immediate = false) {
     const p = typeof v.pos === 'function' ? v.pos() : v.pos;
     if (!is71) {
       v.panner.positionX.value = p[0]; v.panner.positionY.value = p[1]; v.panner.positionZ.value = p[2];
@@ -65,8 +66,9 @@ export function createAudio({ output }) {
     const rel = [p[0] - listener.pos[0], p[1] - listener.pos[1], p[2] - listener.pos[2]];
     const az = (Math.atan2(rel[0] * listener.right[0] + rel[2] * listener.right[2], rel[0] * listener.fwd[0] + rel[2] * listener.fwd[2]) * 180) / Math.PI;
     const gains = speakerGains71(az);
-    v.speakers.forEach(([ch, node]) => node.gain.setTargetAtTime(gains[ch], now, SMOOTH_S));
-    v.dist.gain.setTargetAtTime(inverseDistanceGain(Math.hypot(...rel)), now, SMOOTH_S);
+    const set = (param, value) => (immediate ? (param.value = value) : param.setTargetAtTime(value, now, SMOOTH_S));
+    v.speakers.forEach(([ch, node]) => set(node.gain, gains[ch]));
+    set(v.dist.gain, inverseDistanceGain(Math.hypot(...rel)));
     return p;
   }
 
@@ -95,7 +97,7 @@ export function createAudio({ output }) {
       v.panner = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', ...PANNER });
       filter.connect(v.panner).connect(master);
     }
-    placeVoice(v, now);
+    placeVoice(v, now, true);
     voices.add(v);
     src.onended = () => { voices.delete(v); src.disconnect(); };
     src.start();

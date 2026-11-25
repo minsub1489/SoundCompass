@@ -156,7 +156,7 @@ async function run(map) {
         finished = true;
         document.exitPointerLock();
         downloadCsv(round);
-        ui.showResults(round, { onNext: () => { location.search = ''; } });
+        ui.showResults(round, { onNext: () => { location.search = ''; }, onSave: () => downloadCsv(round) });
       }
     } else if (!round) {
       camera.position.set(map.playerSpawn[0], 12, map.playerSpawn[2] - 10);

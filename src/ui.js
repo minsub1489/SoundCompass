@@ -87,7 +87,7 @@ export function showPaused(onClick) {
 }
 export function hidePaused() { paused?.remove(); paused = null; }
 
-export function showResults(round, { onNext }) {
+export function showResults(round, { onNext, onSave }) {
   clear();
   hud = null;
   const s = round.stats;
@@ -95,9 +95,11 @@ export function showResults(round, { onNext }) {
   const card = el(`<div class="panel"><div class="card">
     <h1>라운드 종료${round.isPractice ? ' (연습)' : ''}</h1>
     <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>
-    <div>${round.isPractice ? '연습 라운드 결과는 저장하지 않습니다.' : '결과 CSV를 다운로드 폴더에 저장했습니다.'}</div>
-    <button>다음</button>
+    <div>${round.isPractice ? '연습 라운드 결과는 저장하지 않습니다.' : '결과 CSV를 다운로드했습니다. 다운로드 폴더에 파일이 없으면 다시 저장하세요.'}</div>
+    ${round.isPractice ? '' : '<button data-save>CSV 다시 저장</button>'}
+    <button data-next>다음</button>
   </div></div>`);
-  card.querySelector('button').addEventListener('click', onNext);
+  card.querySelector('[data-next]').addEventListener('click', onNext);
+  card.querySelector('[data-save]')?.addEventListener('click', onSave);
   root.append(card);
 }
