@@ -36,7 +36,8 @@ export function building({ x, z, w, d, floors, doorSide = 'south', surface, colo
     east: { cx: x + w / 2 - WALL_T / 2, cz: z, along: 'z', len: d - 2 * WALL_T },
   };
   const stairX = i => (i % 2 === 0 ? x - w / 2 + WALL_T + STAIR.width / 2 : x + w / 2 - WALL_T - STAIR.width / 2);
-  const stairZ0 = z - d / 2 + WALL_T + 0.6;
+  // 1.2 m landing in front of the stairs so a character can line up and walk straight onto them.
+  const stairZ0 = z - d / 2 + WALL_T + 1.2;
   const stairLen = STAIR.steps * STAIR.run;
 
   for (let i = 0; i < floors; i++) {
@@ -54,10 +55,12 @@ export function building({ x, z, w, d, floors, doorSide = 'south', surface, colo
   }
   // Slabs for floors 1..floors (the last one is the roof), each with a hole above the stairs below it.
   const ix0 = x - w / 2 + WALL_T, ix1 = x + w / 2 - WALL_T, iz0 = z - d / 2 + WALL_T, iz1 = z + d / 2 - WALL_T;
-  const holeZ0 = stairZ0 - 0.2, holeZ1 = stairZ0 + stairLen + 0.4;
+  // Hole ends where the top step ends; it is wider than the stairs so a character's head clears the slab edge.
+  const holeZ0 = stairZ0 - 0.2, holeZ1 = stairZ0 + stairLen;
   for (let k = 1; k <= floors; k++) {
     const sy = y0 + k * FLOOR_HEIGHT - SLAB_T;
-    const hx = stairX(k - 1), hw = STAIR.width, hx0 = hx - hw / 2, hx1 = hx + hw / 2;
+    const hx0 = Math.max(ix0, stairX(k - 1) - STAIR.width / 2 - 0.5), hx1 = Math.min(ix1, stairX(k - 1) + STAIR.width / 2 + 0.5);
+    const hx = (hx0 + hx1) / 2, hw = hx1 - hx0;
     if (hx0 > ix0) solids.push(block((ix0 + hx0) / 2, sy, z, hx0 - ix0, SLAB_T, iz1 - iz0, extra));
     if (ix1 > hx1) solids.push(block((hx1 + ix1) / 2, sy, z, ix1 - hx1, SLAB_T, iz1 - iz0, extra));
     if (holeZ0 > iz0) solids.push(block(hx, sy, (iz0 + holeZ0) / 2, hw, SLAB_T, holeZ0 - iz0, extra));
