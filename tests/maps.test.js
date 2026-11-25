@@ -33,3 +33,22 @@ describe('validateMap', () => {
     expect(validateMap(bad, { isPractice: false }).some(e => e.includes('bot'))).toBe(true);
   });
 });
+
+describe('본 맵', () => {
+  for (const id of ['urban', 'warehouse', 'forest']) {
+    it(`${id}는 오류가 없다`, () => {
+      expect(MAPS[id], id).toBeDefined();
+      expect(validateMap(MAPS[id], { isPractice: false })).toEqual([]);
+    });
+  }
+  it('세 맵의 크기와 상자 수가 같다', () => {
+    const v = ['urban', 'warehouse', 'forest'].map(id => [MAPS[id].size.join('x'), MAPS[id].crateCount]);
+    expect(new Set(v.map(String)).size).toBe(1);
+  });
+  it('세 맵 모두 높이 2.5 m 이상인 지점이 있다', () => {
+    for (const id of ['urban', 'warehouse', 'forest']) {
+      const pts = [...MAPS[id].crateCandidates, ...MAPS[id].bots.flatMap(b => b.patrol)];
+      expect(Math.max(...pts.map(p => p[1])), id).toBeGreaterThanOrEqual(2.5);
+    }
+  });
+});

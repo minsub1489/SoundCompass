@@ -23,6 +23,45 @@ function wallSegments(cx, cz, along, len, y0, h, opening, extra) {
   return out;
 }
 
+// Raised floor (top at y) on four corner pillars: mezzanines, catwalks, tower tops.
+export function platform({ x, z, w, d, y, surface, color = 0x707a80 }) {
+  const extra = { surface, color };
+  const solids = [block(x, y - SLAB_T, z, w, SLAB_T, d, extra)];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    solids.push(block(x + sx * (w / 2 - 0.2), 0, z + sz * (d / 2 - 0.2), 0.3, y - SLAB_T, 0.3, extra));
+  }
+  return { solids, stairs: [], doors: [] };
+}
+
+// Free-standing stairs climbing `height` from `from` in `dir`, walled on both sides so they are entered from the front.
+export function freeStairs({ from, dir, height, width = STAIR.width, surface, color = 0x666666 }) {
+  const steps = Math.round(height / STAIR.rise), length = steps * STAIR.run;
+  const along = { '+x': [1, 0], '-x': [-1, 0], '+z': [0, 1], '-z': [0, -1] }[dir];
+  const cx = from[0] + along[0] * length / 2, cz = from[2] + along[1] * length / 2;
+  const off = width / 2 + 0.075, wallH = height + 1;
+  const solids = along[0]
+    ? [block(cx, from[1], cz - off, length, wallH, 0.15, { surface, color }), block(cx, from[1], cz + off, length, wallH, 0.15, { surface, color })]
+    : [block(cx - off, from[1], cz, 0.15, wallH, length, { surface, color }), block(cx + off, from[1], cz, 0.15, wallH, length, { surface, color })];
+  return { solids, stairs: [{ from, dir, steps, rise: STAIR.rise, run: STAIR.run, width, surface }], doors: [] };
+}
+
+// Stack of shrinking 0.5 m terraces (within the 0.55 m autostep), e.g. a hill.
+export function terracedHill({ x, z, size, levels, surface, color = 0x4f5f33 }) {
+  const solids = [];
+  for (let k = 0; k < levels; k++) {
+    const s = size - (size / levels) * k;
+    solids.push(block(x, 0.5 * k, z, s, 0.5, s, { surface, color }));
+  }
+  return { solids, stairs: [], doors: [] };
+}
+
+// Merge several kit results into one { solids, stairs, doors }.
+export const merge = (...parts) => ({
+  solids: parts.flatMap(p => p.solids ?? []),
+  stairs: parts.flatMap(p => p.stairs ?? []),
+  doors: parts.flatMap(p => p.doors ?? []),
+});
+
 /**
  * Rectangular building: `floors` storeys, a door on `doorSide` (ground floor), a window centred on every other
  * wall of every floor, interior stairs alternating west/east per floor, and a flat roof with a low parapet.
