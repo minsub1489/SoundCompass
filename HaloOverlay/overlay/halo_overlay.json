@@ -1,0 +1,8 @@
+{
+  "port": 47800,
+  "monitor": 0,
+  "labels_hotkey": "Ctrl+Alt+L",
+  "quit_hotkey": "Ctrl+Alt+Q",
+  "view_pitch_degrees": 30.0,
+  "src": "model"
+}

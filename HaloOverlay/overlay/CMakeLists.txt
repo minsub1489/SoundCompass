@@ -12,11 +12,17 @@ set(UE_SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Source/SoundCompass/SoundVisuali
 add_library(halo_core STATIC
     src/Protocol.cpp
     src/Scene.cpp
+    src/Config.cpp
+    src/UdpReceiver.cpp
+    src/OverlayWindow.cpp
 )
 target_include_directories(halo_core PUBLIC src third_party ${UE_SHARED})
+target_link_libraries(halo_core PUBLIC d3d11 dxgi dcomp d2d1 ws2_32)
 
 add_executable(HaloOverlay WIN32 src/main.cpp)
 target_link_libraries(HaloOverlay PRIVATE halo_core)
+add_custom_command(TARGET HaloOverlay POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/halo_overlay.json $<TARGET_FILE_DIR:HaloOverlay>)
 
 enable_testing()
 function(halo_test name)
@@ -29,3 +35,5 @@ endfunction()
 halo_test(test_protocol)
 halo_test(test_geometry)
 halo_test(test_scene)
+halo_test(test_config)
+halo_test(test_udp)
