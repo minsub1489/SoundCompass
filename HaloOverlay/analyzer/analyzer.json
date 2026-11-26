@@ -1,13 +1,1 @@
-{
-  "fb": {
-    "gcc_phat": 0.0
-  },
-  "class_thresholds": {},
-  "default_threshold": 0.08,
-  "max_events": 3,
-  "reference_db": {},
-  "rise_db": 12.0,
-  "near_db": 8.0,
-  "mid_db": 24.0,
-  "onset_grace_s": 0.5
-}
+{"fb": {"gcc_phat": 0.0}, "class_thresholds": {}, "default_threshold": 0.08, "max_events": 3, "reference_db": {}, "rise_db": 12.0, "near_db": 8.0, "mid_db": 24.0, "onset_grace_s": 0.5, "class_map": {"Whoosh": "Throwable", "MetalHit": "Throwable", "Hiss": "Throwable"}}

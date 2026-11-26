@@ -168,3 +168,12 @@ def test_no_new_class_after_grace():
     assert not analyzer.onset.update(steady, SR)
     classifier.predict = lambda audio, sr: {"class": "Door", "scores": {"Door": 0.9}}
     assert analyzer.process(steady, SR, 4.5)[1] == []                 # long after the last onset: too late
+
+
+def test_class_map_renames_model_labels():
+    """A model with its own labels: the class and its direction both go through class_map."""
+    analyzer, classifier, spatial = make(fb={"fake_spatial": 1.0}, class_map={"Hiss": "Throwable"})
+    classifier.predict = lambda audio, sr: {"class": "Hiss", "scores": {"Hiss": 0.9}}
+    spatial.predict = lambda audio, sr: [{"class": "Hiss", "azimuth": -60.0, "distance": None}]
+    _, events = feed(analyzer, silence(2) + [burst(2)])[-1]
+    assert [(e.cls, e.az) for e in events] == [("Throwable", -60.0)]

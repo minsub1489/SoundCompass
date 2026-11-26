@@ -3,10 +3,10 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .adapters import as_list, class_scores
+from .adapters import as_list, class_scores, overlay_scores, to_overlay
 from .distance import LevelDistance, peak_db
 from .gate import ClassGate, OnsetGate
-from .protocol import CLASSES, Event
+from .protocol import Event
 from .surround import layout_for, surround_peaks
 from .tracker import Detection, Tracker
 
@@ -22,6 +22,7 @@ class AnalyzerConfig:
     near_db: float = 6.0                                          # LevelDistance bin edges below the reference
     mid_db: float = 18.0
     onset_grace_s: float = 0.5                                    # new classes may start this long after an onset
+    class_map: dict[str, str] = field(default_factory=dict)       # model label -> overlay class (adapters.py)
 
 
 def _fold_front(az: float) -> float:
@@ -51,9 +52,10 @@ class Analyzer:
         fb = self.config.fb.get(self.spatial_name, 0.0)
         results = [r for r in as_list(self.spatial.predict(window, sr)) if r.get("azimuth") is not None]
         unclassed = [r for r in results if not r.get("class")]
+        cls_of = [to_overlay(r.get("class"), self.config.class_map) for r in results]
         out = []
         for _, cls in chosen:
-            match = next((r for r in results if r.get("class") == cls), None) or (unclassed.pop(0) if unclassed else None)
+            match = next((r for r, c in zip(results, cls_of) if c == cls), None) or (unclassed.pop(0) if unclassed else None)
             out.append((float(match["azimuth"]), fb, match.get("distance")) if match else None)
         return out
 
@@ -67,11 +69,12 @@ class Analyzer:
             self.tracker.assign([])
             return mode, []
 
-        scores = class_scores(self.classifier.predict(window.mean(axis=1, keepdims=True), sr))
+        scores = overlay_scores(class_scores(self.classifier.predict(window.mean(axis=1, keepdims=True), sr)),
+                                self.config.class_map)
         # Outside an onset's grace period only sounds already being tracked may continue.
         tracked = None if allow_new else {d.cls for _, d in self.tracker.previous}
         chosen = sorted(((s, c) for c, s in scores.items()
-                         if c in CLASSES and self.classes.passes(c, s) and (tracked is None or c in tracked)), reverse=True)
+                         if self.classes.passes(c, s) and (tracked is None or c in tracked)), reverse=True)
         chosen = chosen[:self.config.max_events]
         kept = [(score, cls, d) for (score, cls), d in zip(chosen, self._directions(window, sr, mode, chosen)) if d]
         detections = []

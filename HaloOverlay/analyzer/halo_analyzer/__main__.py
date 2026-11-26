@@ -36,7 +36,12 @@ def main(argv=None) -> int:
     config = AnalyzerConfig(**json.loads(args.config.read_text(encoding="utf-8"))) if args.config.exists() else AnalyzerConfig()
     device = resolve_device(args.device)
     classifier = load_adapter(args.classifier, args.modeleval, device)
-    spatial = None if args.spatial == "none" else load_adapter(args.spatial, args.modeleval, device)
+    if args.spatial == "none":
+        spatial = None
+    elif args.spatial == args.classifier:
+        spatial = classifier  # one model for class and direction, loaded once
+    else:
+        spatial = load_adapter(args.spatial, args.modeleval, device)
     analyzer = Analyzer(classifier, spatial, None if spatial is None else args.spatial, config)
     source = LoopbackSource() if args.input == "loopback" else FileSource(Path(args.input))
     sender = Sender([int(p) for p in args.ports.split(",")])
