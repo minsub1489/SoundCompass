@@ -1,7 +1,11 @@
-// Chrome on Windows occasionally reports one pointer-lock mousemove with a jump of hundreds of px; real flicks at
-// normal polling rates arrive as many small events, so a single event this large is treated as noise.
-const SPIKE_PX = 300;
-export const isMouseSpike = (dx, dy) => Math.abs(dx) > SPIKE_PX || Math.abs(dy) > SPIKE_PX;
+// Chrome on Windows occasionally reports one pointer-lock mousemove with a jump of hundreds of px out of near rest.
+// A real fast turn ramps up (Chrome coalesces events per frame, so big values are normal mid-flick), so only a
+// large event far bigger than the previous one counts as a spike.
+const SPIKE_PX = 250, SPIKE_RATIO = 6, REST_PX = 20, REST_GAP_MS = 100;
+export const isMouseSpike = (dx, dy, prevMag) => {
+  const mag = Math.max(Math.abs(dx), Math.abs(dy));
+  return mag > SPIKE_PX && mag > SPIKE_RATIO * Math.max(prevMag, REST_PX);
+};
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -12,8 +16,14 @@ export function createInput(canvas) {
   addEventListener('keydown', e => { if (locked) { keys.add(e.code); if (e.code === 'Space') e.preventDefault(); } });
   addEventListener('keyup', e => keys.delete(e.code));
   addEventListener('blur', release);
+  let prevMag = 0, prevTime = 0;
   document.addEventListener('mousemove', e => {
-    if (locked && !isMouseSpike(e.movementX, e.movementY)) { dx += e.movementX; dy += e.movementY; }
+    if (!locked) return;
+    if (e.timeStamp - prevTime > REST_GAP_MS) prevMag = 0; // the mouse was resting
+    prevTime = e.timeStamp;
+    if (isMouseSpike(e.movementX, e.movementY, prevMag)) return;
+    prevMag = Math.max(Math.abs(e.movementX), Math.abs(e.movementY));
+    dx += e.movementX; dy += e.movementY;
   });
   canvas.addEventListener('mousedown', e => { if (locked && e.button === 0) firing = true; });
   addEventListener('mouseup', e => { if (e.button === 0) firing = false; });
