@@ -21,6 +21,7 @@ class AnalyzerConfig:
     rise_db: float = 9.0                                          # OnsetGate: rise over the band background
     near_db: float = 6.0                                          # LevelDistance bin edges below the reference
     mid_db: float = 18.0
+    onset_grace_s: float = 0.5                                    # new classes may start this long after an onset
 
 
 def _fold_front(az: float) -> float:
@@ -36,6 +37,7 @@ class Analyzer:
         self.tracker = Tracker()
         self.bins: dict[int, str | None] = {}
         self.active = False
+        self.new_until = float("-inf")
 
     def _directions(self, window, sr, mode, chosen):
         """[(az, fb, dist_m) or None] per chosen class."""
@@ -58,14 +60,16 @@ class Analyzer:
     def process(self, window: np.ndarray, sr: int, t: float) -> tuple[str, list[Event]]:
         window = np.asarray(window, dtype=np.float32)
         mode = "surround" if layout_for(window.shape[1]) else "stereo"
-        onset = self.onset.update(window, sr)
-        if not onset and not self.active:
+        if self.onset.update(window, sr):
+            self.new_until = t + self.config.onset_grace_s
+        allow_new = t <= self.new_until  # the onset hop holds only 0.1 s of the sound: let its class pass a bit later
+        if not allow_new and not self.active:
             self.tracker.assign([])
             return mode, []
 
         scores = class_scores(self.classifier.predict(window.mean(axis=1, keepdims=True), sr))
-        # Without an onset only sounds already being tracked may continue; new classes need an onset.
-        tracked = None if onset else {d.cls for _, d in self.tracker.previous}
+        # Outside an onset's grace period only sounds already being tracked may continue.
+        tracked = None if allow_new else {d.cls for _, d in self.tracker.previous}
         chosen = sorted(((s, c) for c, s in scores.items()
                          if c in CLASSES and self.classes.passes(c, s) and (tracked is None or c in tracked)), reverse=True)
         chosen = chosen[:self.config.max_events]

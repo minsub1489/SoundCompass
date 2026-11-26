@@ -141,3 +141,30 @@ def test_no_onset_only_continues_tracked_classes():
     classifier.predict = lambda audio, sr: {"class": "Gunshot", "scores": {"Door": 0.8, "Gunshot": 0.9}}
     _, events = analyzer.process(steady, SR, 5.0)
     assert [e.cls for e in events] == ["Door"]
+
+
+def test_late_classification_within_onset_grace():
+    """The onset hop holds only 0.1 s of the new sound; its class may only pass a few hops later."""
+    classifier = load_adapter("fake_classifier", FAKE, "cpu")
+    analyzer = Analyzer(classifier, None, None, AnalyzerConfig(onset_grace_s=0.5))
+    quiet = {"class": None, "scores": {"Door": 0.01}}
+    classifier.predict = lambda audio, sr: quiet
+    loud = burst(8, 40.0)
+    steady = np.repeat(loud[-4800:], 10, axis=0)
+    assert feed(analyzer, silence(8) + [loud])[-1][1] == []          # onset at t=0.3, class not sure yet
+    classifier.predict = lambda audio, sr: {"class": "Door", "scores": {"Door": 0.9}}
+    assert [e.cls for e in analyzer.process(steady, SR, 0.6)[1]] == ["Door"]  # 0.3 s after the onset: allowed
+
+
+def test_no_new_class_after_grace():
+    classifier = load_adapter("fake_classifier", FAKE, "cpu")
+    analyzer = Analyzer(classifier, None, None, AnalyzerConfig(onset_grace_s=0.5))
+    classifier.predict = lambda audio, sr: {"class": None, "scores": {"Door": 0.01}}
+    loud = burst(8, 40.0)
+    steady = np.repeat(loud[-4800:], 10, axis=0)
+    feed(analyzer, silence(8) + [loud])
+    for i in range(40):  # the sound keeps playing, unrecognised, until it is the gate's background
+        analyzer.process(steady, SR, 0.4 + 0.1 * i)
+    assert not analyzer.onset.update(steady, SR)
+    classifier.predict = lambda audio, sr: {"class": "Door", "scores": {"Door": 0.9}}
+    assert analyzer.process(steady, SR, 4.5)[1] == []                 # long after the last onset: too late
